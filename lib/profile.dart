@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_application_2/profile_setupscreen.dart';
 import 'notification_service.dart';
+import 'package:flutter_application_2/profile_setupscreen.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -13,10 +13,11 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   String userName = '';
-  String userDOB = '';
-  String dailyGoal = '';
-  String age = '';
-  String selectedImage = 'lib/images/profile1.jpg';
+  int _selectedAge = 18;
+  double heightInCm = 170;
+  double _selectedWeight = 50.0;
+  String? _selectedActivity;
+  String selectedImage = 'lib/images/image.png';
   bool locationPermissionGranted = false;
   bool bluetoothPermissionGranted = false;
   bool activityPermissionGranted = false;
@@ -98,27 +99,23 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> loadProfileDetails() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String dobString = prefs.getString('userDOB') ?? '';
-    DateTime dob = DateTime.tryParse(dobString) ?? DateTime.now();
 
     setState(() {
+      // Load saved data from SharedPreferences and use defaults if not found
       userName = prefs.getString('userName') ?? 'Unknown';
-      userDOB = dobString.isNotEmpty ? dobString : 'Not Set';
-      dailyGoal = prefs.getString('defaultGoal') ?? '2000';
-      selectedImage =
-          prefs.getString('profileImage') ?? 'lib/images/profile1.jpg';
-      age = calculateAge(dob).toString();
-    });
-  }
+      _selectedAge = prefs.getInt('age') ?? 18;
+      heightInCm = prefs.getDouble('heightInCm') ?? 0;
+      _selectedWeight = prefs.getDouble('weight') ?? 50.0;
+      _selectedActivity = prefs.getString('activity') ?? 'Unknown';
 
-  int calculateAge(DateTime dob) {
-    DateTime now = DateTime.now();
-    int age = now.year - dob.year;
-    if (now.month < dob.month ||
-        (now.month == dob.month && now.day < dob.day)) {
-      age--;
-    }
-    return age;
+      // Fetch gender from SharedPreferences
+      String gender = prefs.getString('gender') ?? 'Male'; // Default to Male
+
+      // Set profile image based on gender
+      selectedImage = gender == 'Female'
+          ? 'lib/images/profile2.jpg'
+          : 'lib/images/profile1.jpg';
+    });
   }
 
   @override
@@ -162,18 +159,27 @@ class _ProfilePageState extends State<ProfilePage> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              profileDetailItem('', userName),
-                              profileDetailItem('Age: ', age),
+                              profileDetailItem('Name: ', userName),
+                              profileDetailItem(
+                                  'Age: ',
+                                  _selectedAge
+                                      .toString()), // Convert age to string
+                              profileDetailItem(
+                                  'Height: ',
+                                  heightInCm.toString() +
+                                      ' cm'), // Convert height to string
+                              profileDetailItem(
+                                  'Weight: ',
+                                  _selectedWeight.toString() +
+                                      ' kg'), // Convert weight to string
+                              // Handle null activity
                             ],
-                          ),
+                          )
                         ],
                       ),
                       const SizedBox(height: 16.0),
-                      Row(
-                        children: [
-                          profileDetailItem('Daily Goal (ml): ', dailyGoal),
-                        ],
-                      ),
+                      profileDetailItem(
+                          'Activity Level: ', _selectedActivity ?? 'Not set'),
                     ],
                   ),
                 ),
@@ -365,21 +371,21 @@ class _ProfilePageState extends State<ProfilePage> {
               label,
               style: TextStyle(
                 fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-                color: const Color.fromARGB(255, 9, 47, 103),
+                fontWeight: FontWeight.w500,
+                color: Colors.blueGrey.shade700,
               ),
             ),
             Text(
               value,
               style: TextStyle(
-                fontSize: 20.0,
-                fontWeight: FontWeight.w600,
-                color: Colors.blueGrey.shade800,
+                fontSize: 18.0,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 12.0),
+        const SizedBox(height: 5),
       ],
     );
   }

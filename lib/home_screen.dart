@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_application_2/profile.dart';
+import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,12 +11,64 @@ import 'package:flutter_application_2/steps.dart';
 import 'package:flutter_application_2/widgets/dayselectorwithslides.dart';
 import 'package:flutter_application_2/bottle.dart';
 import 'package:flutter_application_2/analysis.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
 
 class ProfileDisplayScreen extends StatefulWidget {
   const ProfileDisplayScreen({super.key});
 
   @override
   ProfileDisplayScreenState createState() => ProfileDisplayScreenState();
+}
+
+class CircularProgressPainter extends CustomPainter {
+  final double progress;
+  final Color backgroundColor;
+  final Color foregroundColor;
+  final double strokeWidth;
+
+  CircularProgressPainter({
+    required this.progress,
+    required this.backgroundColor,
+    required this.foregroundColor,
+    required this.strokeWidth,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width - strokeWidth) / 2;
+
+    // Draw background circle
+    final backgroundPaint = Paint()
+      ..color = backgroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth;
+
+    canvas.drawCircle(center, radius, backgroundPaint);
+
+    // Draw progress arc
+    final progressPaint = Paint()
+      ..color = foregroundColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      -90 * (3.14159 / 180), // Start from top (-90 degrees)
+      progress * 2 * 3.14159, // Convert progress to radians
+      false,
+      progressPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(CircularProgressPainter oldDelegate) =>
+      progress != oldDelegate.progress ||
+      backgroundColor != oldDelegate.backgroundColor ||
+      foregroundColor != oldDelegate.foregroundColor ||
+      strokeWidth != oldDelegate.strokeWidth;
 }
 
 class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
@@ -39,6 +92,9 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
   int totalGoalsMet = 0;
   int totalIncompleteGoals = 0;
   int totalGoalsIncreased = 0;
+  int steps = StepTrackerService().dailySteps;
+  double distance = StepTrackerService().distance;
+  double calories = StepTrackerService().calories;
 
   @override
   void initState() {
@@ -54,6 +110,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     getCurrentLocation();
     _requestLocationPermission();
     _requestPhysicalActivityPermission();
+    StepTrackerService().initialize();
   }
 
   Future<void> _reloadHomeScreen() async {
@@ -156,20 +213,22 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
 
   Future<void> _loadDailyGoal() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedDate = prefs.getString('selectedDate') ?? selectedDate;
 
-    // Check if the saved date is different from the current date
-    if (savedDate != selectedDate) {
+    // Get today's date in 'YYYY-MM-DD' format
+    final String todayDate = DateTime.now().toIso8601String().split('T')[0];
+    final String savedDate = prefs.getString('selectedDate') ?? todayDate;
+
+    if (savedDate != todayDate) {
       setState(() {
-        dailyGoal = defaultGoal; // Reset dailyGoal to defaultGoal
+        dailyGoal = defaultGoal;
       });
-      // Save the new date and reset the goal in SharedPreferences
-      await prefs.setString('selectedDate', selectedDate);
+
+      // Save new date and reset goal
+      await prefs.setString('selectedDate', todayDate);
       await prefs.setInt('dailyGoal', defaultGoal);
     } else {
       setState(() {
-        dailyGoal =
-            prefs.getInt('dailyGoal') ?? defaultGoal; // Load saved dailyGoal
+        dailyGoal = prefs.getInt('dailyGoal') ?? defaultGoal; // Load saved goal
       });
     }
   }
@@ -240,9 +299,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
       },
     );
   }
-  
- 
-
 
   Future<void> getCurrentLocation() async {
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -367,555 +423,630 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     setState(() {});
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
+  String _getHydrationRecommendation() {
+    if (temperature <= 20) {
+      if (humidity < 40)
+        return 'Cool and dry? Stick with 2000 ml today and sip regularly.';
+      if (humidity <= 60)
+        return 'Cool and comfy! 2000 ml is perfect for today.';
+      return 'Cool but humid? Aim for 2250 ml to stay energized.';
+    } else if (temperature <= 25) {
+      if (humidity < 40)
+        return 'Warm and dry? Boost to 2500 ml to avoid fatigue.';
+      if (humidity <= 60)
+        return 'A bit warm? Drink 2500 ml to keep your energy up.';
+      return 'Warm and humid? Go for 2750 ml to stay hydrated.';
+    } else if (temperature <= 30) {
+      if (humidity < 40)
+        return 'Hot and dry? 2750 ml will protect against dehydration.';
+      if (humidity <= 60) return 'Feeling the heat? Drink 2750-3000 ml today.';
+      return 'Hot and sticky? Aim for 3000 ml to replace lost fluids.';
+    } else {
+      if (humidity < 40)
+        return 'Extreme heat! At least 3250 ml to stay hydrated.';
+      if (humidity <= 60)
+        return 'Hot and sweaty? 3250-3500 ml is needed today.';
+      return 'Humid and scorching? Drink 3500 ml to stay cool and energized!';
+    }
+  }
 
-    final horizontalPadding = screenWidth * 0.04;
-    final verticalPadding = screenHeight * 0.02;
-
-    double progress = dailyIntake / dailyGoal;
-
-    return Scaffold(
-      backgroundColor: Colors.blueGrey.shade100,
-      appBar: AppBar(
-        toolbarHeight: screenHeight * 0.1,
-        backgroundColor: const Color.fromARGB(255, 2, 10, 104),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildSleepInfoItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white70),
+        const SizedBox(width: 8),
+        Column(
           children: [
             Text(
-              'Hello $userName',
-              style: TextStyle(
-                color: Colors.blueGrey.shade100,
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 16,
                 fontWeight: FontWeight.bold,
+                color: Colors.white,
               ),
             ),
             Text(
-              'Welcome Back!',
-              style: TextStyle(
-                color: Colors.blueGrey.shade100,
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
+              subtitle,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: Colors.white70,
               ),
             ),
           ],
         ),
-        automaticallyImplyLeading: false,
-        actions: [
-          Row(
-            children: [
-              Padding(
-                padding: EdgeInsets.only(
-                    top: screenHeight * 0.03, right: screenWidth * 0.04),
-                child: Row(
-                  children: [
-                    const SizedBox(width: 3),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(width: 15),
-                        Row(children: [
-                          Icon(
-                            Icons.local_fire_department,
-                            color: Colors
-                                .red.shade400, //Color.fromARGB(255, 2, 32, 78),
-                            size: 30,
-                          ),
-                          Text(
-                            '$streak',
-                            style: TextStyle(
-                              fontSize: 22,
-                              color: Colors.red.shade400,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ])
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: _reloadHomeScreen,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: horizontalPadding,
-              vertical: verticalPadding,
+      ],
+    );
+  }
+
+  Widget _buildSuggestionItem({
+    required IconData icon,
+    required String text,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, color: Colors.white70, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: Colors.white70,
             ),
-            child: Column(
-              children: [
-                SizedBox(height: screenHeight * 0.005),
-                Container(
-                  width: screenWidth * 1.0,
-                  height: screenHeight * 0.14,
-                  decoration: BoxDecoration(
-                    color: Colors.blueGrey.shade200,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Center(
-                    child: DaySelectorWithSlides(
-                      isLoading: isLoading,
-                      dop: dop,
-                      selectedDateTime:
-                          DateFormat('yyyy-MM-dd').parse(selectedDate),
-                      dailyIntakes: dailyIntakes,
-                      defaultGoal: defaultGoal,
-                      onDateSelected: (date) {
-                        setState(() {
-                          selectedDate = date;
-                          dailyIntake = dailyIntakes[date] ?? 0;
-                        });
-                      },
-                    ),
-                  ),
-                ),
-                SizedBox(height: screenHeight * 0.01),
-                Container(
-                  width: screenWidth * 1.0,
-                  //height: screenHeight * 0.39,
-                  height: 210,
-                  decoration: BoxDecoration(
-                    color: Colors.blueGrey.shade100,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Stack(
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final horizontalPadding = screenWidth * 0.05;
+    final verticalPadding = screenHeight * 0.02;
+    double progress = dailyIntake / dailyGoal;
+
+    return PopScope(
+      canPop: false, // Prevents going back
+
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0A0E21),
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF0A0E21),
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          //systemOverlayStyle: SystemUiOverlayStyle.light,
+          toolbarHeight: 75,
+          flexibleSpace: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 0),
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.black.withOpacity(0.2),
+                  Colors.lightBlue.withOpacity(0.2),
+                ],
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Center(
-                        child: SizedBox(
-                          width: 160,
-                          height: 160,
-                          child: CircularProgressIndicator(
-                            value: progress,
-                            strokeWidth: 20,
-                            backgroundColor: Colors.blueGrey.shade600,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Color.fromARGB(255, 9, 47, 103),
-                            ),
-                          ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'HydraSense',
+                        style: GoogleFonts.pacifico(
+                          fontSize: 24,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.white,
                         ),
                       ),
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Stay hydrated, stay healthy!',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      color: Colors.white70,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        body: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 0),
+          child: RefreshIndicator(
+            onRefresh: _reloadHomeScreen,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  SizedBox(height: screenHeight * 0.02),
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.blueGrey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        const SizedBox(height: 5),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            //const SizedBox(height: 70),
-                            Text(
-                              '$dailyIntake',
-                              style: TextStyle(
-                                fontSize: 28,
-                                color: Colors.blueGrey.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            _buildSleepInfoItem(
+                              icon: Icons.local_fire_department_sharp,
+                              title: '$streak',
+                              subtitle: 'Strak Days',
                             ),
-                            Text(
-                              '/$dailyGoal ml',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blueGrey.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            _buildSleepInfoItem(
+                              icon: Icons.directions_walk_rounded,
+                              title: '$steps',
+                              subtitle: 'Step Count',
                             ),
                           ],
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 15),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            _buildSleepInfoItem(
+                              icon: Icons.water_drop_outlined,
+                              title: humidity == -1 ? 'Turn on' : '$humidity %',
+                              subtitle: 'Humidity',
+                            ),
+                            _buildSleepInfoItem(
+                              icon: Icons.wb_sunny_outlined,
+                              title: humidity == -1
+                                  ? 'Internet'
+                                  : '$temperature°C',
+                              subtitle: 'Temperature',
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 5),
-                Row(
-                  mainAxisAlignment:
-                      MainAxisAlignment.spaceEvenly, // Align both containers
-                  children: [
-                    Container(
-                      width: screenWidth * 0.30,
-                      height: screenHeight * 0.11,
-                      decoration: BoxDecoration(
-                        color: Colors.blueGrey.shade200,
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Stack(
-                        children: [
-                          Center(
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                //const SizedBox(height: 10),
-                                Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      const SizedBox(height: 5),
-                                      Text(
-                                        'Reached',
-                                        style: TextStyle(
-                                          fontSize: 15,
-                                          color: Colors.blueGrey.shade900,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                        textAlign: TextAlign.center,
-                                      ),
-                                      Column(
-                                        children: [
-                                          Text(
-                                            '${(progress * 100).toInt()}%',
-                                            style: const TextStyle(
-                                              fontSize: 18,
-                                              color: Color.fromARGB(
-                                                  255, 2, 10, 104),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          Text(
-                                            'of Goal',
-                                            style: TextStyle(
-                                              fontSize: 11,
-                                              color: Colors.blueGrey.shade900,
-                                              fontWeight: FontWeight.w600,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: const BoxDecoration(
-                                color: Color.fromARGB(255, 2, 10, 104),
-                                borderRadius: BorderRadius.only(
-                                  bottomRight: Radius.circular(10),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.auto_graph,
-                                color: Colors.white,
-                                size: 15,
-                              ),
-                            ),
-                          ),
-                        ],
+                  SizedBox(height: screenHeight * 0.02),
+                  // Day Selector
+                  Container(
+                    padding: EdgeInsets.only(left: 8, right: 8),
+                    //width: 10,
+                    height: screenHeight * 0.14,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF0A0E21),
+                      //borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: Center(
+                      child: DaySelectorWithSlides(
+                        isLoading: isLoading,
+                        dop: dop,
+                        selectedDateTime:
+                            DateFormat('yyyy-MM-dd').parse(selectedDate),
+                        dailyIntakes: dailyIntakes,
+                        defaultGoal: defaultGoal,
+                        onDateSelected: (date) {
+                          setState(() {
+                            selectedDate = date;
+                            dailyIntake = dailyIntakes[date] ?? 0;
+                          });
+                        },
                       ),
                     ),
-                    const SizedBox(width: 3),
-                    Container(
-                      width: screenWidth * 0.30,
-                      height: screenHeight * 0.11,
-                      decoration: BoxDecoration(
-                        color: Colors.blueGrey.shade200,
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
+                  ),
+                  SizedBox(height: screenHeight * 0.02),
+
+                  // Circular Progress
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 150,
+                          height: 150,
+                          child: CustomPaint(
+                            painter: CircularProgressPainter(
+                              progress: progress,
+                              backgroundColor: Colors.white.withOpacity(0.1),
+                              foregroundColor: Colors.blue,
+                              strokeWidth: 15,
+                            ),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    "${(progress * 100).toInt()}%",
+                                    style: GoogleFonts.inter(
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Daily Goal',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 16,
+                                      color: Colors.white70,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ],
-                      ),
-                      child: Stack(
-                        children: [
-                          Center(
+                        ),
+                        const SizedBox(width: 30),
+                        Expanded(
+                          child: Container(
+                            height: 150,
+                            padding: const EdgeInsets.all(15),
+                            decoration: BoxDecoration(
+                              //color: Colors.white.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
                             child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Text(
-                                  'Temperature',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    color: Colors.blueGrey.shade900,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
-                                      Icons.thermostat,
-                                      color: Colors.blue.shade500,
-                                    ),
+                                    //const SizedBox(width: 8),
                                     Text(
-                                      '$temperature°C',
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        color: Color.fromARGB(255, 2, 10, 104),
+                                      'Daily Intake',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
+                                        color: Colors.white,
                                       ),
                                     ),
+                                    // const Icon(
+                                    //   Icons.water_drop,
+                                    //   color: Colors.blue,
+                                    //   size: 15,
+                                    // ),
                                   ],
                                 ),
+                                //const SizedBox(height: 15),
+                                Text(
+                                  '$dailyIntake ml',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                // const SizedBox(height: 8),
+                                Text(
+                                  'of $dailyGoal ml goal',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                                const SizedBox(height: 15),
+                                GestureDetector(
+                                  onTap: () => _increaseDailyGoal(),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                      horizontal: 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.lightBlue.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text(
+                                      'Adjust Goal',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Container(
-                              width: 20,
-                              height: 20,
-                              decoration: const BoxDecoration(
-                                color: Color.fromARGB(255, 2, 10, 104),
-                                borderRadius: BorderRadius.only(
-                                  bottomRight: Radius.circular(10),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.blueGrey.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.tips_and_updates,
+                                color: Colors.amber,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Daily Suggestions',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
-                              child: const Icon(
-                                Icons.wb_sunny_rounded,
-                                color: Colors.white,
-                                size: 15,
-                              ),
-                            ),
+                            ],
+                          ),
+                          const SizedBox(height: 15),
+                          _buildSuggestionItem(
+                            icon: Icons.wb_sunny,
+                            text: _getHydrationRecommendation(),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSuggestionItem(
+                            icon: Icons.directions_walk,
+                            text: "High activity detected - drink more water",
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSuggestionItem(
+                            icon: Icons.access_time,
+                            text: "You haven't had water in the last 2 hours",
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSuggestionItem(
+                            icon: Icons.trending_up,
+                            text: "You're 8 days into your hydration streak!",
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 3),
-                    Container(
-                      width: screenWidth * 0.30,
-                      height: screenHeight * 0.11,
-                      decoration: BoxDecoration(
-                        color: Colors.blueGrey.shade200,
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
+                  ),
+                  //SizedBox(height: screenHeight * 0.001),
+
+                  // Stats Row
+                  // Wrap(
+                  //   spacing: screenWidth * 0.008,
+                  //   runSpacing: screenHeight * 0.02,
+                  //   alignment: WrapAlignment.center,
+                  //   children: [
+                  //     _buildStatCard("Reached", "${(progress * 100).toInt()}%",
+                  //         "of Goal", Icons.auto_graph),
+                  //     _buildStatCard(
+                  //         "Temperature", "$temperature°C", "", Icons.thermostat),
+                  //     Container(
+                  //       width: screenWidth * 0.29,
+                  //       height: screenHeight * 0.11,
+                  //       decoration: BoxDecoration(
+                  //         color: Colors.blueGrey.shade200,
+                  //         borderRadius: BorderRadius.circular(15),
+                  //       ),
+                  //       child: Center(child: StepsTracker()),
+                  //     ),
+                  //   ],
+                  // ),
+                  SizedBox(height: screenHeight * 0.008),
+
+                  // Weather & Increase Goal
+                  // _buildWeatherCard(screenWidth, screenHeight),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // Bottom Navigation
+        bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: const Color(0xFF0A0E21),
+          type: BottomNavigationBarType.fixed,
+          selectedItemColor: Colors.white,
+          unselectedItemColor: Colors.blueGrey.shade400,
+          onTap: (index) {
+            switch (index) {
+              case 0:
+                break;
+              case 1:
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const BottlePage()),
+                );
+                break;
+              case 2:
+                addWater(250);
+                break;
+              case 3:
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        AnalysisPage(dailyIntakes: dailyIntakes),
+                  ),
+                );
+                break;
+              case 4:
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+                break;
+            }
+          },
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.water_drop_rounded), label: 'Bottle'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.add_circle_outline), label: 'Add'),
+            BottomNavigationBarItem(
+                icon: Icon(Icons.analytics), label: 'Analysis'),
+            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeatherCard(double screenWidth, double screenHeight) {
+    return Container(
+      padding: const EdgeInsets.only(left: 15, top: 15),
+      width: double.infinity,
+      height: screenHeight * 0.22,
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade200,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          weatherDescription,
+                          style: const TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(width: 8),
+                        if (weatherIcon.isNotEmpty)
+                          Image.network(
+                            'https://openweathermap.org/img/w/$weatherIcon.png',
+                            width: 30,
+                            height: 30,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return const Icon(Icons.cloud_sync,
+                                  color: Colors.white, size: 30);
+                            },
                           ),
-                        ],
-                      ),
-                      child: Center(
-                        child: StepsTracker(),
-                      ),
+                      ],
+                    ),
+                    Text(
+                      humidity == -1
+                          ? 'Turn on Internet'
+                          : 'Humidity: $humidity%   ',
+                      style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.blueGrey.shade900,
+                          fontWeight: FontWeight.w600),
                     ),
                   ],
                 ),
                 const SizedBox(height: 5),
-                Container(
-                  padding: EdgeInsets.only(left: 15, top: 15),
-                  width: screenWidth * 1.0,
-                  height: screenHeight * 0.20,
-                  decoration: BoxDecoration(
-                    color: Colors.blueGrey.shade200,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Stack(
-                    children: [
-                      // Main content
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(right: 10),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      weatherDescription,
-                                      style: const TextStyle(
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.w700,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    if (weatherIcon.isNotEmpty)
-                                      Image.network(
-                                        'https://openweathermap.org/img/w/$weatherIcon.png', // Use the dynamic weather icon
-                                        width: 30,
-                                        height: 30,
-                                        fit: BoxFit.cover,
-                                        errorBuilder:
-                                            (context, error, stackTrace) {
-                                          // Fallback icon in case of an error
-                                          return const Icon(Icons.cloud_sync,
-                                              color: Colors.white, size: 30);
-                                        },
-                                      ),
-                                  ],
-                                ),
-                                Text(
-                                  humidity == -1
-                                      ? 'Turn on Internet'
-                                      : 'Humidity: $humidity%',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    color: Colors.blueGrey.shade900,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Container(
-                            padding:
-                                EdgeInsets.only(top: 5, right: 5, bottom: 5),
-                            width: screenWidth *
-                                0.9, // Adjusted width to fit suggestion text
-                            child: Text(
-                              temperature <= 20
-                                  ? (humidity < 40
-                                      ? 'Cool and dry? Stick with 2000 ml today and sip water regularly to stay hydrated and energetic.'
-                                      : (humidity <= 60
-                                          ? 'Cool and comfy! 2000 ml of water is perfect to keep you refreshed and ready for the day.'
-                                          : 'Cool but humid? Aim for 2250 ml to stay energized and beat the hidden effects of humidity.'))
-                                  : (temperature > 20 && temperature <= 25
-                                      ? (humidity < 40
-                                          ? 'Warm and dry? Boost to 2500 ml to avoid fatigue and stay sharp all day long.'
-                                          : (humidity <= 60
-                                              ? 'A bit warm? Drink 2500 ml of water to keep your energy levels steady and body refreshed.'
-                                              : 'Warm and humid? Go for 2750 ml to replace lost fluids and keep yourself feeling great.'))
-                                      : (temperature > 25 && temperature <= 30
-                                          ? (humidity < 40
-                                              ? 'Hot and dry weather calls for 2750 ml to protect yourself from dehydration. Take small sips throughout the day to stay cool.'
-                                              : (humidity <= 60
-                                                  ? 'Feeling the heat? Drink 2750-3000 ml to stay hydrated & maintain energy levels..'
-                                                  : 'Hot and sticky? Aim for 3000 ml to combat sweat loss and feel your best all day.'))
-                                          : (temperature > 30
-                                              ? (humidity < 40
-                                                  ? 'Extreme heat and dryness demand at least 3250 ml to keep your body functioning well....'
-                                                  : (humidity <= 60
-                                                      ? 'Hot and sweaty? Recharge with 3250-3500 ml to feel energized and avoid dehydration.'
-                                                      : 'Humid and scorching? Drink 3500 ml to stay cool and conquer the day with ease!'))
-                                              : 'Stay hydrated to perform your best and feel amazing!'))),
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.blueGrey.shade800,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              textAlign: TextAlign.center,
-                              maxLines: 2,
-                              overflow: TextOverflow
-                                  .ellipsis, // Prevent text overflow
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      // Elevated Button at the bottom
-                      Positioned(
-                        bottom: 10, // Adjust as needed
-                        left: 15,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor:
-                                const Color.fromARGB(255, 2, 10, 104),
-                          ),
-                          onPressed: _increaseDailyGoal,
-                          child: Text(
-                            '+ Increase Goal',
-                            style: TextStyle(
-                              color: Colors.blueGrey.shade100,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          width: 60,
-                          height: 60,
-                          decoration: const BoxDecoration(
-                            color: Color.fromARGB(255, 2, 10, 104),
-                            borderRadius: BorderRadius.only(
-                              topRight: Radius.zero,
-                              topLeft: Radius.circular(10),
-                            ),
-                          ),
-                          child: const Icon(Icons.self_improvement_rounded,
-                              color: Colors.white, size: 30),
-                        ),
-                      ),
-                    ],
+                Text(
+                  _getHydrationRecommendation(),
+                  style: TextStyle(
+                      fontSize: 15,
+                      color: Colors.blueGrey.shade800,
+                      fontWeight: FontWeight.bold),
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 10),
+                Align(
+                  alignment: Alignment.bottomLeft,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 2, 10, 104)),
+                    onPressed: _increaseDailyGoal,
+                    child: Text('+ Increase Goal',
+                        style: TextStyle(color: Colors.blueGrey.shade100)),
                   ),
                 ),
               ],
             ),
           ),
-        ),
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(255, 9, 47, 103),
+                  borderRadius:
+                      const BorderRadius.only(bottomRight: Radius.circular(15)),
+                ),
+                child: const Icon(Icons.self_improvement_rounded,
+                    size: 30, color: Colors.white)),
+          ),
+        ],
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.blueGrey.shade100,
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color.fromARGB(255, 9, 47, 103),
-        unselectedItemColor: Colors.blueGrey.shade400,
-        onTap: (index) {
-          switch (index) {
-            case 0:
-              break;
-            case 1:
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BottlePage(),
+    );
+  }
+
+// Helper function for stat cards
+  Widget _buildStatCard(
+    String title,
+    String value,
+    String subtext,
+    IconData icon,
+  ) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    return Container(
+      width: screenWidth * 0.29,
+      height: screenHeight * 0.11,
+      decoration: BoxDecoration(
+        color: Colors.blueGrey.shade200,
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Stack(
+        children: [
+          Center(
+            // Ensures text is centered
+            child: Column(
+              mainAxisSize: MainAxisSize.min, // Prevents extra spacing
+              children: [
+                Text(title,
+                    style:
+                        TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(value,
+                    style:
+                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                if (subtext.isNotEmpty)
+                  Text(subtext, style: TextStyle(fontSize: 12)),
+              ],
+            ),
+          ),
+          Positioned(
+            bottom: 0, // Adjust to move the icon up/down
+            right: 0, // Adjust to move the icon left/right
+            child: Container(
+                width: 25,
+                height: 25,
+                decoration: BoxDecoration(
+                  color: const Color.fromARGB(255, 9, 47, 103),
+                  borderRadius:
+                      BorderRadius.only(bottomRight: Radius.circular(15)),
                 ),
-              );
-              break;
-            case 2:
-              addWater(250);
-              break;
-            case 3:
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) =>
-                      AnalysisPage(dailyIntakes: dailyIntakes),
-                ),
-              );
-              break;
-            case 4:
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ProfilePage(),
-                ),
-              );
-              break;
-          }
-        },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.water_drop_rounded),
-            label: 'Bottle',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline),
-            label: 'Add',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.analytics),
-            label: 'Analysis',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
+                child: Icon(icon, size: 20, color: Colors.white)),
           ),
         ],
       ),

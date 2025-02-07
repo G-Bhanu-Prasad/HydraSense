@@ -57,86 +57,120 @@ class DaySelectorWithSlides extends StatelessWidget {
       );
     }
 
-    return SizedBox(
-      height: 150,
-      child: PageView.builder(
-        itemCount: weeks.length,
-        controller: PageController(
-          initialPage: weeks.length - 1, // Start at the last (current) week
-        ),
-        itemBuilder: (context, index) {
-          List<DateTime> week = weeks[index];
-          return Column(
+    return Column(
+      children: [
+        // Header with Month-Year on the left and Today-Date on the right
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10.0),
-                child: Text(
-                  '${DateFormat('MMM d yyyy').format(week.first)} - ${DateFormat('MMM d yyyy').format(week.last)}',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16),
-                ),
+              Text(
+                DateFormat('MMMM yyyy')
+                    .format(selectedDateTime), // Left: Month & Year
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: week.map((date) {
-                  String dateStr = DateFormat('yyyy-MM-dd').format(date);
-                  double progress = (dailyIntakes[dateStr] ?? 0) / defaultGoal;
-                  bool isFutureDay = date.isAfter(today);
-                  bool isProfileCreationDate = date.isAtSameMomentAs(dop);
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        GestureDetector(
-                          onTap: isFutureDay
-                              ? null
-                              : () => onDateSelected(dateStr),
-                          child: CircleAvatar(
-                            backgroundColor: isSelectedDate(date)
-                                ? const Color.fromARGB(255, 2, 10, 104)
-                                : (isFutureDay
-                                    ? Colors.grey.shade700
-                                    : isProfileCreationDate
-                                        ? Colors.green.shade700
-                                        : Colors.blueGrey.shade400),
-                            child: Text(
-                              DateFormat('E').format(date),
-                              style: TextStyle(color: Colors.blueGrey.shade100),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Stack(
-                          children: [
-                            Container(
-                              width: 38,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: Colors.blueGrey[100],
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                            Container(
-                              width: 38 * (progress > 1.0 ? 1.0 : progress),
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: const Color.fromARGB(255, 2, 10, 104),
-                                borderRadius: BorderRadius.circular(3),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
+              Text(
+                isSelectedDate(today)
+                    ? "Today, ${DateFormat('d').format(selectedDateTime)}" // Show only "Today" if selected date is today
+                    : "Otherday, ${DateFormat('d').format(selectedDateTime)}",
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
               ),
             ],
-          );
-        },
-      ),
+          ),
+        ),
+        SizedBox(height: 10),
+        SizedBox(
+          height: 60,
+          child: PageView.builder(
+            itemCount: weeks.length,
+            controller: PageController(
+              initialPage: weeks.length - 1, // Start at the last (current) week
+            ),
+            itemBuilder: (context, index) {
+              List<DateTime> week = weeks[index];
+              return Column(
+                children: [
+                  // Padding(
+                  //   padding: const EdgeInsets.symmetric(vertical: 10.0),
+                  //   child: Text(
+                  //     '${DateFormat('MMM d yyyy').format(week.first)} - ${DateFormat('MMM d yyyy').format(week.last)}',
+                  //     style: const TextStyle(
+                  //         fontWeight: FontWeight.bold, fontSize: 16),
+                  //   ),
+                  // ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: week.map((date) {
+                      String dateStr = DateFormat('yyyy-MM-dd').format(date);
+                      double progress =
+                          (dailyIntakes[dateStr] ?? 0) / defaultGoal;
+                      bool isFutureDay = date.isAfter(today);
+                      bool isProfileCreationDate = date.isAtSameMomentAs(dop);
+
+                      return Column(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            child: MaterialButton(
+                              onPressed: isFutureDay
+                                  ? null
+                                  : () => onDateSelected(dateStr),
+                              color: isSelectedDate(date)
+                                  ? Colors.blue
+                                  : (isFutureDay
+                                      ? Colors.grey.shade700
+                                      : isProfileCreationDate
+                                          ? Colors.cyan.shade900
+                                          : Color.fromARGB(255, 9, 47, 103)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              padding: EdgeInsets.zero,
+                              child: Text(
+                                DateFormat('E').format(date),
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Stack(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: Colors.blueGrey[100],
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                              Container(
+                                width: 40 * (progress > 1.0 ? 1.0 : progress),
+                                height: 6,
+                                decoration: BoxDecoration(
+                                  color: Colors.blue,
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ],
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

@@ -4,7 +4,7 @@ import 'package:flutter_application_2/notification_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_2/profile_setupscreen.dart';
+import 'package:flutter_application_2/profilescreens.dart/name.dart';
 import 'package:flutter_application_2/home_screen.dart';
 
 Future<void> requestExactAlarmPermission() async {
@@ -21,17 +21,17 @@ void main() async {
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]).then((_) {
-    runApp(const ProfileApp());
+    runApp(const HydraSense());
   });
 }
 
-class ProfileApp extends StatelessWidget {
-  const ProfileApp({super.key});
+class HydraSense extends StatelessWidget {
+  const HydraSense({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Profile App',
+      title: 'HydraSense',
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
@@ -63,7 +63,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     if (isFirstTimeUser) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ProfileSetupScreen()),
+        MaterialPageRoute(builder: (context) => const NameInputScreen()),
       );
     } else {
       Navigator.pushReplacement(
