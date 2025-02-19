@@ -7,11 +7,11 @@ class PieChartSample extends StatelessWidget {
   final int totalGoalsIncreased;
 
   const PieChartSample({
-    Key? key,
+    super.key,
     required this.totalGoalsMet,
     required this.totalIncompleteGoals,
     required this.totalGoalsIncreased,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

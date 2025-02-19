@@ -6,7 +6,7 @@ class DaySelectorWithSlides extends StatelessWidget {
   final DateTime dop;
   final DateTime selectedDateTime;
   final Map<String, int> dailyIntakes;
-  final int defaultGoal;
+  final int dailyGoal;
   final ValueChanged<String> onDateSelected;
 
   const DaySelectorWithSlides({
@@ -14,7 +14,7 @@ class DaySelectorWithSlides extends StatelessWidget {
     required this.dop,
     required this.selectedDateTime,
     required this.dailyIntakes,
-    required this.defaultGoal,
+    required this.dailyGoal,
     required this.onDateSelected,
     super.key,
   });
@@ -23,6 +23,19 @@ class DaySelectorWithSlides extends StatelessWidget {
     return selectedDateTime.year == date.year &&
         selectedDateTime.month == date.month &&
         selectedDateTime.day == date.day;
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: selectedDateTime,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+
+    if (picked != null) {
+      onDateSelected(DateFormat('yyyy-MM-dd').format(picked));
+    }
   }
 
   @override
@@ -65,22 +78,29 @@ class DaySelectorWithSlides extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                DateFormat('MMMM yyyy')
-                    .format(selectedDateTime), // Left: Month & Year
-                style: const TextStyle(
+              GestureDetector(
+                onTap: () => _selectDate(context),
+                child: Text(
+                  DateFormat('MMMM yyyy').format(selectedDateTime),
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white),
+                    color: Colors.white,
+                  ),
+                ),
               ),
-              Text(
-                isSelectedDate(today)
-                    ? "Today, ${DateFormat('d').format(selectedDateTime)}" // Show only "Today" if selected date is today
-                    : "Otherday, ${DateFormat('d').format(selectedDateTime)}",
-                style: const TextStyle(
+              GestureDetector(
+                onTap: () => _selectDate(context),
+                child: Text(
+                  isSelectedDate(today)
+                      ? "Today, ${DateFormat('d').format(selectedDateTime)}"
+                      : "Otherday, ${DateFormat('d').format(selectedDateTime)}",
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white),
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ],
           ),
@@ -97,26 +117,18 @@ class DaySelectorWithSlides extends StatelessWidget {
               List<DateTime> week = weeks[index];
               return Column(
                 children: [
-                  // Padding(
-                  //   padding: const EdgeInsets.symmetric(vertical: 10.0),
-                  //   child: Text(
-                  //     '${DateFormat('MMM d yyyy').format(week.first)} - ${DateFormat('MMM d yyyy').format(week.last)}',
-                  //     style: const TextStyle(
-                  //         fontWeight: FontWeight.bold, fontSize: 16),
-                  //   ),
-                  // ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: week.map((date) {
                       String dateStr = DateFormat('yyyy-MM-dd').format(date);
                       double progress =
-                          (dailyIntakes[dateStr] ?? 0) / defaultGoal;
+                          (dailyIntakes[dateStr] ?? 0) / dailyGoal;
                       bool isFutureDay = date.isAfter(today);
                       bool isProfileCreationDate = date.isAtSameMomentAs(dop);
 
                       return Column(
                         children: [
-                          Container(
+                          SizedBox(
                             width: 40,
                             height: 40,
                             child: MaterialButton(

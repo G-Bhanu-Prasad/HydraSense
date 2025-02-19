@@ -7,7 +7,7 @@ import 'dart:convert';
 class DailyWaterIntakeChart extends StatelessWidget {
   final List<int> dailyIntakes;
 
-  DailyWaterIntakeChart({required this.dailyIntakes, super.key});
+  const DailyWaterIntakeChart({required this.dailyIntakes, super.key});
 
   Future<void> calculateWeeklyAndMonthlyData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();

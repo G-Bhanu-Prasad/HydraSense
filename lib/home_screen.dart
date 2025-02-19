@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/profile.dart';
-import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -9,10 +7,10 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_application_2/steps.dart';
 import 'package:flutter_application_2/widgets/dayselectorwithslides.dart';
-import 'package:flutter_application_2/bottle.dart';
-import 'package:flutter_application_2/analysis.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
+import 'navbar.dart';
+import 'dart:async';
 
 class ProfileDisplayScreen extends StatefulWidget {
   const ProfileDisplayScreen({super.key});
@@ -92,14 +90,12 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
   int totalGoalsMet = 0;
   int totalIncompleteGoals = 0;
   int totalGoalsIncreased = 0;
-  int steps = StepTrackerService().dailySteps;
-  double distance = StepTrackerService().distance;
-  double calories = StepTrackerService().calories;
-
+  int steps = 0;
+  DateTime? lastWaterIntake;
+//changed
   @override
   void initState() {
     super.initState();
-    //_initializeDOB();
     _initializeProfileCreationDate().then((_) {
       setState(() {
         isLoading = false;
@@ -110,7 +106,22 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     getCurrentLocation();
     _requestLocationPermission();
     _requestPhysicalActivityPermission();
-    StepTrackerService().initialize();
+
+    //changed
+    _loadLastWaterIntake();
+    // Fetch steps and listen for changes
+    StepTrackerService().initialize().then((_) {
+      setState(() {
+        steps = StepTrackerService().dailySteps;
+      });
+
+      // Update hydration messages dynamically
+      Timer.periodic(Duration(seconds: 1), (timer) {
+        setState(() {
+          steps = StepTrackerService().dailySteps;
+        });
+      });
+    });
   }
 
   Future<void> _reloadHomeScreen() async {
@@ -205,38 +216,75 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
       String todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
       goalMetToday = prefs.getString('lastStreakUpdate') == todayStr;
 
-      if (dailyIntake >= defaultGoal && !goalMetToday) {
+      if (dailyIntake >= dailyGoal && !goalMetToday) {
         checkStreak(prefs);
       }
     });
   }
 
   Future<void> _loadDailyGoal() async {
-    final prefs = await SharedPreferences.getInstance();
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    double calculatedGoal = await calculateDailyWaterGoal();
+    setState(() {
+      dailyGoal = (calculatedGoal * 1000).toInt();
+    });
+    await prefs.setInt('dailyGoal', dailyGoal);
+  }
 
-    // Get today's date in 'YYYY-MM-DD' format
-    final String todayDate = DateTime.now().toIso8601String().split('T')[0];
-    final String savedDate = prefs.getString('selectedDate') ?? todayDate;
+  Future<double> calculateDailyWaterGoal() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    int age = prefs.getInt('age') ?? 18;
+    double height = prefs.getDouble('heightInCm') ?? 170.0;
+    double weight = prefs.getDouble('weight') ?? 70.0;
+    int steps = prefs.getInt('steps') ?? 0;
+    String gender = prefs.getString('gender') ?? 'Male';
 
-    if (savedDate != todayDate) {
-      setState(() {
-        dailyGoal = defaultGoal;
-      });
+    double bmi = weight / ((height / 100) * (height / 100));
+    double adjustedBmi =
+        bmi + (0.23 * age) - (5.4 * (gender == 'Male' ? 1 : 0));
+    double baseIntake = (gender == 'Male') ? 3.0 : 2.7;
 
-      // Save new date and reset goal
-      await prefs.setString('selectedDate', todayDate);
-      await prefs.setInt('dailyGoal', defaultGoal);
-    } else {
-      setState(() {
-        dailyGoal = prefs.getInt('dailyGoal') ?? defaultGoal; // Load saved goal
-      });
-    }
+    double activityAdjustment = (steps < 5000)
+        ? 0.0
+        : (steps < 10000)
+            ? 0.5
+            : 1.0;
+    double weightAdjustment = (weight < 60)
+        ? 0.5
+        : (weight > 90)
+            ? 0.5
+            : 0.0;
+    double ageAdjustment = (age < 30)
+        ? 0.7
+        : (age > 55)
+            ? 0.3
+            : 0.5;
+    double heightAdjustment = (height > 180)
+        ? 0.3
+        : (height < 160)
+            ? -0.3
+            : 0.0;
+    double bmiAdjustment = (adjustedBmi >= 30 || adjustedBmi < 18.5)
+        ? 0.7
+        : (adjustedBmi >= 25)
+            ? 0.5
+            : 0.0;
+
+    double totalIntake = baseIntake +
+        activityAdjustment +
+        weightAdjustment +
+        ageAdjustment +
+        heightAdjustment +
+        bmiAdjustment;
+    return totalIntake;
   }
 
   Future<void> _saveDailyGoal(int goal) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('dailyGoal', goal);
   }
+
+  // Add this for date formatting
 
   Future<void> _increaseDailyGoal() async {
     final TextEditingController inputController = TextEditingController();
@@ -245,17 +293,19 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Increase Daily Goal',
-              style: TextStyle(
-                color: Color.fromARGB(255, 9, 47, 103),
-                fontWeight: FontWeight.w500,
-              )),
+          title: const Text(
+            'Increase Daily Goal',
+            style: TextStyle(
+              color: Color.fromARGB(255, 9, 47, 103),
+              fontWeight: FontWeight.w500,
+            ),
+          ),
           backgroundColor: Colors.blueGrey.shade200,
           content: TextField(
             controller: inputController,
             keyboardType: TextInputType.number,
             decoration: const InputDecoration(
-              hintText: 'Enter additional ml(e.g., 500)',
+              hintText: 'Enter additional ml (e.g., 500)',
             ),
           ),
           actions: [
@@ -274,15 +324,19 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
               onPressed: () async {
                 final input = int.tryParse(inputController.text);
                 if (input != null && input > 0) {
+                  SharedPreferences prefs =
+                      await SharedPreferences.getInstance();
+
                   setState(() {
                     dailyGoal += input;
                     totalGoalsIncreased += 1;
                   });
-                  _saveDailyGoal(dailyGoal);
-                  SharedPreferences prefs =
-                      await SharedPreferences.getInstance();
-                  prefs.setInt('totalGoalsIncreased', totalGoalsIncreased);
+
+                  // Save updated goal & date
                   prefs.setInt('dailyGoal', dailyGoal);
+                  prefs.setInt('totalGoalsIncreased', totalGoalsIncreased);
+                  prefs.setString('lastUpdatedDate',
+                      DateFormat('yyyy-MM-dd').format(DateTime.now()));
                 }
                 Navigator.of(context).pop();
               },
@@ -390,13 +444,16 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     }
   }
 
-  void addWater(int amount) {
+  void addWater(int amount) async {
     DateTime today = DateTime.now();
     String todayDate = DateFormat('yyyy-MM-dd').format(today);
 
     if (selectedDate != todayDate) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Cannot update previous day's data")),
+        SnackBar(
+          content: Text("Cannot update previous day's data"),
+          backgroundColor: Colors.pink.shade700,
+        ),
       );
       return;
     }
@@ -405,6 +462,9 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
       dailyIntake += amount;
       dailyIntakes[selectedDate] = dailyIntake;
     });
+    //changed
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lastWaterIntake', DateTime.now().toIso8601String());
     updateDailyIntake(dailyIntake);
   }
 
@@ -425,28 +485,76 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
 
   String _getHydrationRecommendation() {
     if (temperature <= 20) {
-      if (humidity < 40)
-        return 'Cool and dry? Stick with 2000 ml today and sip regularly.';
-      if (humidity <= 60)
-        return 'Cool and comfy! 2000 ml is perfect for today.';
-      return 'Cool but humid? Aim for 2250 ml to stay energized.';
+      if (humidity < 40) {
+        return 'Cool and dry? Stick with your daily goal of $dailyGoal ml and sip throughout the day to maintain hydration.';
+      }
+      if (humidity <= 60) {
+        return 'Cool and comfortable! Your target of $dailyGoal ml is just right—stay consistent.';
+      }
+      return 'Cool but humid? Add at least 250 ml to prevent sluggishness and stay refreshed.';
     } else if (temperature <= 25) {
-      if (humidity < 40)
-        return 'Warm and dry? Boost to 2500 ml to avoid fatigue.';
-      if (humidity <= 60)
-        return 'A bit warm? Drink 2500 ml to keep your energy up.';
-      return 'Warm and humid? Go for 2750 ml to stay hydrated.';
-    } else if (temperature <= 30) {
-      if (humidity < 40)
-        return 'Hot and dry? 2750 ml will protect against dehydration.';
-      if (humidity <= 60) return 'Feeling the heat? Drink 2750-3000 ml today.';
-      return 'Hot and sticky? Aim for 3000 ml to replace lost fluids.';
+      if (humidity < 40) {
+        return 'Warm and dry conditions—boost intake by 500 ml to prevent dehydration symptoms like fatigue.';
+      }
+      if (humidity <= 60) {
+        return 'Mildly warm? Increase intake by 500 ml to support energy levels and prevent mild dehydration.';
+      }
+      return 'Warm and humid? Increase your intake by 700 ml to counter extra fluid loss.';
+    } else if (temperature <= 38) {
+      if (humidity < 40) {
+        return 'Hot and dry? Increase by 700 ml to replace lost fluids and avoid dehydration risks.';
+      }
+      if (humidity <= 60) {
+        return 'Feeling the heat? Aim for a total of 2750-3000 ml today to sustain optimal hydration.';
+      }
+      return 'Hot and humid? Increase by at least 700 ml to replenish fluids lost through sweating.';
     } else {
-      if (humidity < 40)
-        return 'Extreme heat! At least 3250 ml to stay hydrated.';
-      if (humidity <= 60)
-        return 'Hot and sweaty? 3250-3500 ml is needed today.';
-      return 'Humid and scorching? Drink 3500 ml to stay cool and energized!';
+      if (humidity < 40) {
+        return 'Extreme heat alert! Boost intake by at least 750 ml and consider electrolyte replenishment if sweating heavily.';
+      }
+      if (humidity <= 60) {
+        return 'High temperatures and sweating? Increase intake by 700-800 ml and stay mindful of hydration cues.';
+      }
+      return 'Scorching and humid? Increase by 1000 ml or more to avoid overheating and fatigue!';
+    }
+  }
+
+  String _getHydrationMessage(int steps) {
+    if (steps < 1000) {
+      return "Low activity - stay hydrated with regular sips.";
+    } else if (steps < 5000) {
+      return "Moderate activity detected - keep drinking water.";
+    } else if (steps < 8000) {
+      return "High activity detected - drink more water.";
+    } else {
+      return "Very active! Ensure you're drinking enough water.";
+    }
+  }
+
+  String _getLastIntakeMessage() {
+    DateTime now = DateTime.now();
+    if (lastWaterIntake == null) {
+      return "Stay hydrated! Drink some water.";
+    }
+
+    Duration difference = now.difference(lastWaterIntake!);
+    if (difference.inMinutes < 30) {
+      return "Good job! Keep drinking water regularly.";
+    } else if (difference.inMinutes < 120) {
+      return "You haven't had water in the last hour. Stay hydrated!";
+    } else {
+      return "You haven't had water in the last 2 hours.";
+    }
+  }
+
+  Future<void> _loadLastWaterIntake() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? lastIntakeString = prefs.getString('lastWaterIntake');
+
+    if (lastIntakeString != null) {
+      setState(() {
+        lastWaterIntake = DateTime.parse(lastIntakeString);
+      });
     }
   }
 
@@ -512,11 +620,19 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     double progress = dailyIntake / dailyGoal;
 
     return PopScope(
-      canPop: false, // Prevents going back
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          SystemNavigator.pop(); // This closes the app
+        }
+      },
+
+      // Prevents going back
 
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0E21),
         appBar: AppBar(
+          scrolledUnderElevation: 0,
           backgroundColor: const Color(0xFF0A0E21),
           elevation: 0,
           automaticallyImplyLeading: false,
@@ -580,7 +696,9 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                     margin: const EdgeInsets.symmetric(horizontal: 20),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.blueGrey.withOpacity(0.1),
+                      color: Colors.cyan.shade900.withOpacity(0.05),
+                      // color: const Color.fromARGB(255, 17, 51, 82)
+                      //     .withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -592,12 +710,12 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                             _buildSleepInfoItem(
                               icon: Icons.local_fire_department_sharp,
                               title: '$streak',
-                              subtitle: 'Strak Days',
+                              subtitle: 'Streak Days',
                             ),
                             _buildSleepInfoItem(
                               icon: Icons.directions_walk_rounded,
                               title: '$steps',
-                              subtitle: 'Step Count',
+                              subtitle: 'Steps Count',
                             ),
                           ],
                         ),
@@ -639,7 +757,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                         selectedDateTime:
                             DateFormat('yyyy-MM-dd').parse(selectedDate),
                         dailyIntakes: dailyIntakes,
-                        defaultGoal: defaultGoal,
+                        dailyGoal: dailyGoal,
                         onDateSelected: (date) {
                           setState(() {
                             selectedDate = date;
@@ -774,7 +892,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.blueGrey.withOpacity(0.1),
+                        color: Colors.cyan.shade900.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Column(
@@ -806,12 +924,12 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                           const SizedBox(height: 12),
                           _buildSuggestionItem(
                             icon: Icons.directions_walk,
-                            text: "High activity detected - drink more water",
+                            text: _getHydrationMessage(steps),
                           ),
                           const SizedBox(height: 12),
                           _buildSuggestionItem(
                             icon: Icons.access_time,
-                            text: "You haven't had water in the last 2 hours",
+                            text: _getLastIntakeMessage(),
                           ),
                           const SizedBox(height: 12),
                           _buildSuggestionItem(
@@ -856,51 +974,10 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
         ),
 
         // Bottom Navigation
-        bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: const Color(0xFF0A0E21),
-          type: BottomNavigationBarType.fixed,
-          selectedItemColor: Colors.white,
-          unselectedItemColor: Colors.blueGrey.shade400,
-          onTap: (index) {
-            switch (index) {
-              case 0:
-                break;
-              case 1:
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const BottlePage()),
-                );
-                break;
-              case 2:
-                addWater(250);
-                break;
-              case 3:
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        AnalysisPage(dailyIntakes: dailyIntakes),
-                  ),
-                );
-                break;
-              case 4:
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const ProfilePage()),
-                );
-                break;
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.water_drop_rounded), label: 'Bottle'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.add_circle_outline), label: 'Add'),
-            BottomNavigationBarItem(
-                icon: Icon(Icons.analytics), label: 'Analysis'),
-            BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          ],
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 0,
+          addWater: () => addWater(250),
+          dailyIntakes: dailyIntakes, // Ensure this is passed
         ),
       ),
     );

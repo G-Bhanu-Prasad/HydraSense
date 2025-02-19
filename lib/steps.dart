@@ -70,7 +70,7 @@ class StepTrackerService {
   }
 
   void _onStepCountError(dynamic error) {
-    _dailySteps = 404;
+    _dailySteps = 0;
     _distance = 0;
     _calories = 0;
   }

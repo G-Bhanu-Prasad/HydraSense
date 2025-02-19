@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_application_2/profilescreens.dart/name.dart';
 import 'package:flutter_application_2/home_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 Future<void> requestExactAlarmPermission() async {
   if (await Permission.scheduleExactAlarm.isDenied) {
@@ -17,26 +18,32 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   tz.initializeTimeZones();
   await NotificationService().initialize();
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
-  ]).then((_) {
-    runApp(const HydraSense());
-  });
+  ]);
+
+  // Check if the user is a first-time user before launching the app
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  bool isFirstTimeUser = prefs.getBool('isFirstTimeUser') ?? true;
+
+  runApp(HydraSense(isFirstTimeUser: isFirstTimeUser));
 }
 
 class HydraSense extends StatelessWidget {
-  const HydraSense({super.key});
+  final bool isFirstTimeUser;
+
+  const HydraSense({super.key, required this.isFirstTimeUser});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'HydraSense',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
       debugShowCheckedModeBanner: false,
-      home: const ProfileScreen(),
+      home: isFirstTimeUser
+          ? const ProfileScreen()
+          : const ProfileDisplayScreen(),
     );
   }
 }
@@ -52,42 +59,132 @@ class ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      checkFirstTimeUser();
-    });
+    _markUserAsNotFirstTime();
   }
 
-  void checkFirstTimeUser() async {
+  Future<void> _markUserAsNotFirstTime() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool isFirstTimeUser = prefs.getBool('isFirstTimeUser') ?? true;
-    if (isFirstTimeUser) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const NameInputScreen()),
-      );
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const ProfileDisplayScreen()),
-      );
-    }
+    await prefs.setBool('isFirstTimeUser', false);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile App'),
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Welcome to Bottle',
-              style: TextStyle(fontSize: 24.0),
-            ),
-          ],
+      backgroundColor: const Color(0xFF0A0E21),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(18.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'HydraSense',
+                style: GoogleFonts.pacifico(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w400,
+                  color: Colors.white,
+                ),
+              ),
+              Image.asset("lib/images/wel.png"),
+              const SizedBox(height: 15),
+              RichText(
+                textAlign: TextAlign.center,
+                text: TextSpan(
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 25,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  children: [
+                    const TextSpan(text: 'A sip today, a spark in mind, stay '),
+                    TextSpan(
+                      text: 'hydrated',
+                      style: const TextStyle(color: Colors.blue),
+                    ),
+                    const TextSpan(text: ', stay aligned'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 15),
+              const Text(
+                'Let’s make every drop count! 💧',
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+              const SizedBox(height: 80),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color.fromARGB(255, 10, 33, 210).withOpacity(0.3),
+                      Colors.cyan.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NameInputScreen(),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Get Started',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 15),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color.fromARGB(255, 10, 33, 210).withOpacity(0.3),
+                      Colors.cyan.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ElevatedButton(
+                  onPressed: () {},
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    shadowColor: Colors.transparent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      'Sign in',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

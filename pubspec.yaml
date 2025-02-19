@@ -84,6 +84,8 @@ flutter:
     - lib/images/profile2.jpg
     - lib/images/bottlepage.png
     - lib/images/image.png
+    - lib/images/welcomeback.png
+    - lib/images/wel.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

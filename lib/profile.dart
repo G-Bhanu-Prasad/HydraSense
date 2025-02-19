@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'notification_service.dart';
-import 'package:flutter_application_2/profile_setupscreen.dart';
+import 'package:flutter_application_2/profileedit.dart';
+import 'navbar.dart';
+import 'home_screen.dart';
+import 'dart:convert';
+import 'package:google_fonts/google_fonts.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -21,6 +25,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool locationPermissionGranted = false;
   bool bluetoothPermissionGranted = false;
   bool activityPermissionGranted = false;
+  Map<String, int> dailyIntakes = {};
 
   final NotificationService _notificationService = NotificationService();
 
@@ -30,6 +35,18 @@ class _ProfilePageState extends State<ProfilePage> {
     loadProfileDetails();
     _notificationService.initialize();
     checkInitialPermissions();
+    _loadDailyIntakes();
+  }
+
+  Future<void> _loadDailyIntakes() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? dailyIntakesJson = prefs.getString('dailyIntakes');
+
+    if (dailyIntakesJson != null) {
+      setState(() {
+        dailyIntakes = Map<String, int>.from(jsonDecode(dailyIntakesJson));
+      });
+    }
   }
 
   Future<void> checkInitialPermissions() async {
@@ -106,7 +123,7 @@ class _ProfilePageState extends State<ProfilePage> {
       _selectedAge = prefs.getInt('age') ?? 18;
       heightInCm = prefs.getDouble('heightInCm') ?? 0;
       _selectedWeight = prefs.getDouble('weight') ?? 50.0;
-      _selectedActivity = prefs.getString('activity') ?? 'Unknown';
+      _selectedActivity = prefs.getString('activity') ?? '80';
 
       // Fetch gender from SharedPreferences
       String gender = prefs.getString('gender') ?? 'Male'; // Default to Male
@@ -120,273 +137,411 @@ class _ProfilePageState extends State<ProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey.shade100,
-      appBar: AppBar(
-        backgroundColor: const Color.fromARGB(255, 9, 47, 103),
-        toolbarHeight: 70,
-        title: Text(
-          'Profile',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => ProfileDisplayScreen()),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0A0E21),
+        appBar: AppBar(
+          automaticallyImplyLeading: true,
+          backgroundColor: const Color(0xFF0A0E21),
+          scrolledUnderElevation: 0,
+          elevation: 0,
+          leading: IconButton(
+            icon:
+                const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+            onPressed: () {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => ProfileDisplayScreen()),
+              );
+            },
           ),
+          title: const Text(
+            'Profile',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          centerTitle: true,
         ),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Profile Container
-            Stack(
+        body: Padding(
+          padding: const EdgeInsets.all(10.0),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    color: Colors.white,
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
+                // Profile Section
+                Row(
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            const Color.fromARGB(255, 10, 33, 210)
+                                .withOpacity(0.3),
+                            Colors.cyan.withOpacity(0.8),
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(30),
+                        child: Image.asset(
+                          selectedImage,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          CircleAvatar(
-                            radius: 50,
-                            backgroundImage: AssetImage(selectedImage),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Hello!',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.white,
+                            ),
                           ),
-                          const SizedBox(height: 16.0, width: 20),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              profileDetailItem('Name: ', userName),
-                              profileDetailItem(
-                                  'Age: ',
-                                  _selectedAge
-                                      .toString()), // Convert age to string
-                              profileDetailItem(
-                                  'Height: ',
-                                  heightInCm.toString() +
-                                      ' cm'), // Convert height to string
-                              profileDetailItem(
-                                  'Weight: ',
-                                  _selectedWeight.toString() +
-                                      ' kg'), // Convert weight to string
-                              // Handle null activity
-                            ],
-                          )
+                          Text(
+                            userName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 16.0),
-                      profileDetailItem(
-                          'Activity Level: ', _selectedActivity ?? 'Not set'),
-                    ],
+                    ),
+                    IconButton(
+                      icon:
+                          const Icon(Icons.edit_outlined, color: Colors.white),
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ProfileEditScreen(),
+                          ),
+                        ).then((_) => loadProfileDetails());
+                      },
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                // General Section
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'General',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: IconButton(
-                    icon: const Icon(Icons.edit, color: Colors.blueGrey),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const ProfileSetupScreen(),
-                        ),
-                      ).then((_) {
-                        loadProfileDetails(); // Reload details after editing
-                      });
-                    },
+                Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.black.withOpacity(0.2),
+                        Colors.lightBlue.withOpacity(0.2),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(15),
                   ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 16.0, top: 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment
+                            .start, // Aligns children to the left
+                        children: [
+                          Text(
+                            'Notifications',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          ElevatedButton(
+                            onPressed: () async {
+                              final List<Map<String, dynamic>>
+                                  hydrationSchedule = [
+                                {
+                                  "time": const TimeOfDay(hour: 5, minute: 0),
+                                  "message":
+                                      "Start your day with a glass of water! \n "
+                                },
+                                {
+                                  "time": const TimeOfDay(hour: 8, minute: 0),
+                                  "message":
+                                      "Time for your morning hydration boost!"
+                                },
+                                {
+                                  "time": const TimeOfDay(hour: 10, minute: 0),
+                                  "message":
+                                      "Stay refreshed! Drink some water now."
+                                },
+                                {
+                                  "time": const TimeOfDay(hour: 14, minute: 0),
+                                  "message":
+                                      "Midday hydration check: Grab a glass!"
+                                },
+                                {
+                                  "time": const TimeOfDay(hour: 18, minute: 0),
+                                  "message": "Evening reminder: Keep hydrating!"
+                                },
+                                {
+                                  "time": const TimeOfDay(hour: 21, minute: 0),
+                                  "message":
+                                      "End your day right: Drink some water."
+                                },
+                              ];
+
+                              for (var schedule in hydrationSchedule) {
+                                final TimeOfDay time = schedule["time"];
+                                final String message = schedule["message"];
+                                final now = DateTime.now();
+                                final DateTime scheduledDateTime = DateTime(
+                                  now.year,
+                                  now.month,
+                                  now.day,
+                                  time.hour,
+                                  time.minute,
+                                );
+
+                                if (scheduledDateTime.isAfter(now)) {
+                                  await _notificationService
+                                      .scheduleHydrationNotification(
+                                    scheduledDateTime,
+                                    message,
+                                  );
+                                }
+                              }
+
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                        "Hydration notifications with messages scheduled."),
+                                    backgroundColor: Colors.blue,
+                                  ),
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.teal,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.all(12),
+                            ),
+                            child:
+                                const Text("Schedule Hydration Notifications"),
+                          ),
+                          _buildListTile(
+                            icon: Icons.account_balance_wallet_outlined,
+                            title: 'Physical Information',
+                            trailing:
+                                '$_selectedWeight kg, ${heightInCm.toStringAsFixed(0)} cm',
+                            onTap: () {},
+                          ),
+                          _buildListTile(
+                            icon: Icons.auto_graph_outlined,
+                            title: 'Hydration Score',
+                            trailing: _selectedActivity ?? 'Not set',
+                            onTap: () {},
+                          ),
+                          _buildListTile(
+                            icon: Icons.password_rounded,
+                            title: 'Change Password',
+                            trailing: null,
+                            onTap: () {},
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Permissions Section
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Permissions',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                _buildPermissionTile(
+                  icon: Icons.location_on_outlined,
+                  title: 'Location',
+                  subtitle: 'Required to obtain weather',
+                  value: locationPermissionGranted,
+                  onChanged: () =>
+                      handlePermissionToggle(Permission.location, "Location"),
+                ),
+                // _buildPermissionTile(
+                //   icon: Icons.bluetooth_outlined,
+                //   title: 'Bluetooth',
+                //   value: bluetoothPermissionGranted,
+                //   onChanged: () =>
+                //       handlePermissionToggle(Permission.bluetooth, "Bluetooth"),
+                // ),
+                _buildPermissionTile(
+                  icon: Icons.directions_run_outlined,
+                  title: 'Physical Activity',
+                  subtitle: 'Required for Step count',
+                  value: activityPermissionGranted,
+                  onChanged: () => handlePermissionToggle(
+                      Permission.activityRecognition, "Physical Activity"),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Support Section
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Support',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                // _buildListTile(
+                //   icon: Icons.headset_mic_outlined,
+                //   title: 'Support',
+                //   onTap: () {},
+                // ),
+                _buildListTile(
+                  icon: Icons.info_outline,
+                  title: 'About Us',
+                  onTap: () {},
+                ),
+                _buildListTile(
+                  icon: Icons.phone_outlined,
+                  title: 'Contact Us',
+                  onTap: () {},
+                ),
+
+                const SizedBox(height: 16),
+
+                // Exit Button
+                _buildListTile(
+                  icon: Icons.logout,
+                  title: 'Logout',
+                  textColor: Colors.red,
+                  iconColor: Colors.red,
+                  onTap: () {},
                 ),
               ],
             ),
-
-            const SizedBox(height: 20),
-            // Notifications Section
-            Text(
-              'Settings:',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.blueGrey.shade800,
-                fontSize: 18,
-              ),
-            ),
-            const SizedBox(height: 15),
-            Container(
-              width: 350,
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-                color: Colors.white,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Notifications:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey.shade800,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: () async {
-                      final List<Map<String, dynamic>> hydrationSchedule = [
-                        {
-                          "time": const TimeOfDay(hour: 5, minute: 0),
-                          "message": "Start your day with a glass of water! \n "
-                        },
-                        {
-                          "time": const TimeOfDay(hour: 8, minute: 0),
-                          "message": "Time for your morning hydration boost!"
-                        },
-                        {
-                          "time": const TimeOfDay(hour: 10, minute: 0),
-                          "message": "Stay refreshed! Drink some water now."
-                        },
-                        {
-                          "time": const TimeOfDay(hour: 14, minute: 0),
-                          "message": "Midday hydration check: Grab a glass!"
-                        },
-                        {
-                          "time": const TimeOfDay(hour: 18, minute: 0),
-                          "message": "Evening reminder: Keep hydrating!"
-                        },
-                        {
-                          "time": const TimeOfDay(hour: 21, minute: 0),
-                          "message": "End your day right: Drink some water."
-                        },
-                      ];
-
-                      for (var schedule in hydrationSchedule) {
-                        final TimeOfDay time = schedule["time"];
-                        final String message = schedule["message"];
-                        final now = DateTime.now();
-                        final DateTime scheduledDateTime = DateTime(
-                          now.year,
-                          now.month,
-                          now.day,
-                          time.hour,
-                          time.minute,
-                        );
-
-                        if (scheduledDateTime.isAfter(now)) {
-                          await _notificationService
-                              .scheduleHydrationNotification(
-                            scheduledDateTime,
-                            message,
-                          );
-                        }
-                      }
-
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                "Hydration notifications with messages scheduled."),
-                            backgroundColor: Colors.blue,
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.teal,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.all(12),
-                    ),
-                    child: const Text("Schedule Hydration Notifications"),
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    'Permissions:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blueGrey.shade800,
-                      fontSize: 18,
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  permissionToggleRow(
-                    "Location\nRequired to obtain weather",
-                    locationPermissionGranted,
-                    () =>
-                        handlePermissionToggle(Permission.location, "Location"),
-                  ),
-                  const SizedBox(height: 10),
-                  permissionToggleRow(
-                    "Bluetooth",
-                    bluetoothPermissionGranted,
-                    () => handlePermissionToggle(
-                        Permission.bluetooth, "Bluetooth"),
-                  ),
-                  const SizedBox(height: 10),
-                  permissionToggleRow(
-                    "Physical Activity\nRequired for Step count",
-                    activityPermissionGranted,
-                    () => handlePermissionToggle(
-                        Permission.activityRecognition, "Physical Activity"),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
+        ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: 4,
+          dailyIntakes: dailyIntakes,
         ),
       ),
     );
   }
 
-  Widget permissionToggleRow(
-      String label, bool isGranted, VoidCallback onToggle) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 16.0,
-            fontWeight: FontWeight.w600,
-            color: Colors.blueGrey.shade800,
-          ),
+  Widget _buildListTile({
+    required IconData icon,
+    required String title,
+    String? trailing,
+    required VoidCallback onTap,
+    Color textColor = Colors.white,
+    Color iconColor = Colors.white,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor, size: 24),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: textColor,
         ),
-        Switch(
-          value: isGranted,
-          onChanged: (value) => onToggle(),
-          activeColor: Colors.teal,
-        ),
-      ],
+      ),
+      trailing: trailing != null
+          ? Text(
+              trailing,
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.white,
+              ),
+            )
+          : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
+      onTap: onTap,
     );
   }
 
-  Widget profileDetailItem(String label, String value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.w500,
-                color: Colors.blueGrey.shade700,
-              ),
-            ),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 18.0,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
-              ),
-            ),
-          ],
+  Widget _buildPermissionTile({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    required bool value,
+    required VoidCallback onChanged,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.white, size: 24),
+      title: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+          color: Colors.white,
         ),
-        const SizedBox(height: 5),
-      ],
+      ),
+      subtitle: subtitle != null
+          ? Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.white,
+              ),
+            )
+          : null,
+      trailing: Switch(
+        value: value,
+        onChanged: (_) => onChanged(),
+        activeColor: Colors.blue,
+      ),
     );
   }
 }

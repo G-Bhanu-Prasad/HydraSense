@@ -6,7 +6,7 @@ class DaySelectorWithSlides extends StatelessWidget {
   final DateTime dop;
   final DateTime selectedDateTime;
   final Map<String, int> dailyIntakes;
-  final int defaultGoal;
+  final int dailyGoal;
   final ValueChanged<String> onDateSelected;
 
   const DaySelectorWithSlides({
@@ -14,7 +14,7 @@ class DaySelectorWithSlides extends StatelessWidget {
     required this.dop,
     required this.selectedDateTime,
     required this.dailyIntakes,
-    required this.defaultGoal,
+    required this.dailyGoal,
     required this.onDateSelected,
     super.key,
   });
@@ -74,7 +74,7 @@ class DaySelectorWithSlides extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: week.map((date) {
                   String dateStr = DateFormat('yyyy-MM-dd').format(date);
-                  double progress = (dailyIntakes[dateStr] ?? 0) / defaultGoal;
+                  double progress = (dailyIntakes[dateStr] ?? 0) / dailyGoal;
                   bool isFutureDay = date.isAfter(today);
                   bool isProfileCreationDate = date.isAtSameMomentAs(dop);
 
