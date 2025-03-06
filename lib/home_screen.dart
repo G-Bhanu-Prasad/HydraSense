@@ -302,63 +302,176 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: const Text(
-            'Increase Daily Goal',
-            style: TextStyle(
-              color: Color.fromARGB(255, 9, 47, 103),
-              fontWeight: FontWeight.w500,
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: const Color(0xFF0A0E21),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+              border:
+                  Border.all(color: Colors.blue.withOpacity(0.2), width: 1.5),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.blue.withOpacity(0.2),
+                        Colors.cyan.shade900.withOpacity(0.1),
+                      ],
+                    ),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(20),
+                      topRight: Radius.circular(20),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Icon(Icons.water_drop, color: Colors.blue.shade300),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Adjust Daily Goal',
+                        style: GoogleFonts.inter(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: inputController,
+                        keyboardType: TextInputType.number,
+                        style: GoogleFonts.inter(color: Colors.white),
+                        cursorColor: Colors.blue,
+                        decoration: InputDecoration(
+                          hintText: 'Enter additional ml(e.g 500)',
+                          hintStyle:
+                              GoogleFonts.inter(color: Colors.grey.shade500),
+                          filled: true,
+                          fillColor: Colors.black.withOpacity(0.2),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: Colors.blue.shade300),
+                          ),
+                          prefixIcon: Icon(
+                            Icons.add_circle_outline,
+                            color: Colors.blue.shade300,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 15,
+                            horizontal: 15,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Current goal: $dailyGoal ml',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          color: Colors.grey.shade400,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop();
+                          },
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.grey.withOpacity(0.1),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: GoogleFonts.inter(
+                              color: Colors.grey.shade400,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final input = int.tryParse(inputController.text);
+                            if (input != null && input > 0) {
+                              SharedPreferences prefs =
+                                  await SharedPreferences.getInstance();
+
+                              setState(() {
+                                dailyGoal += input;
+                                totalGoalsIncreased += 1;
+                              });
+
+                              // Save updated goal & date
+                              prefs.setInt('dailyGoal', dailyGoal);
+                              prefs.setInt(
+                                  'totalGoalsIncreased', totalGoalsIncreased);
+                              prefs.setString(
+                                  'lastUpdatedDate',
+                                  DateFormat('yyyy-MM-dd')
+                                      .format(DateTime.now()));
+                            }
+                            Navigator.of(context).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue.shade800,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: Text(
+                            'Save',
+                            style: GoogleFonts.inter(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
-          backgroundColor: Colors.blueGrey.shade200,
-          content: TextField(
-            controller: inputController,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(
-              hintText: 'Enter additional ml (e.g., 500)',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: Text(
-                'Cancel',
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 229, 53, 94),
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () async {
-                final input = int.tryParse(inputController.text);
-                if (input != null && input > 0) {
-                  SharedPreferences prefs =
-                      await SharedPreferences.getInstance();
-
-                  setState(() {
-                    dailyGoal += input;
-                    totalGoalsIncreased += 1;
-                  });
-
-                  // Save updated goal & date
-                  prefs.setInt('dailyGoal', dailyGoal);
-                  prefs.setInt('totalGoalsIncreased', totalGoalsIncreased);
-                  prefs.setString('lastUpdatedDate',
-                      DateFormat('yyyy-MM-dd').format(DateTime.now()));
-                }
-                Navigator.of(context).pop();
-              },
-              child: const Text(
-                'Save',
-                style: TextStyle(
-                  color: Color.fromARGB(255, 9, 47, 103),
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
         );
       },
     );

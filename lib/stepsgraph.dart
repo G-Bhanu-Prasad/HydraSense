@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 
 class StepsActivityChart extends StatefulWidget {
-  final List<int> dailySteps;
-  final String timeFrame; // "daily", "weekly", "monthly"
+  final List<int> stepsData;
+  final String timeFrame; // "daily", "monthly"
 
   const StepsActivityChart({
     Key? key,
-    required this.dailySteps,
+    required this.stepsData,
     this.timeFrame = "daily",
   }) : super(key: key);
 
@@ -23,10 +23,9 @@ class _StepsActivityChartState extends State<StepsActivityChart> {
         alignment: BarChartAlignment.spaceAround,
         barTouchData: BarTouchData(
           touchTooltipData: BarTouchTooltipData(
-            //tooltipBackgroundColor: Colors.black.withOpacity(0.8),
             getTooltipItem: (group, groupIndex, rod, rodIndex) {
               return BarTooltipItem(
-                '${widget.dailySteps[groupIndex]} steps',
+                '${widget.stepsData[groupIndex]} steps',
                 const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
@@ -41,71 +40,9 @@ class _StepsActivityChartState extends State<StepsActivityChart> {
             sideTitles: SideTitles(
               showTitles: true,
               getTitlesWidget: (value, meta) {
-                String text = '';
-                switch (widget.timeFrame) {
-                  case "daily":
-                    switch (value.toInt()) {
-                      case 0:
-                        text = '12AM';
-                        break;
-                      case 4:
-                        text = '4AM';
-                        break;
-                      case 8:
-                        text = '8AM';
-                        break;
-                      case 12:
-                        text = '12PM';
-                        break;
-                      case 16:
-                        text = '4PM';
-                        break;
-                      case 20:
-                        text = '8PM';
-                        break;
-                      default:
-                        text = '';
-                    }
-                    break;
-                  case "weekly":
-                    switch (value.toInt()) {
-                      case 0:
-                        text = 'Mon';
-                        break;
-                      case 1:
-                        text = 'Tue';
-                        break;
-                      case 2:
-                        text = 'Wed';
-                        break;
-                      case 3:
-                        text = 'Thu';
-                        break;
-                      case 4:
-                        text = 'Fri';
-                        break;
-                      case 5:
-                        text = 'Sat';
-                        break;
-                      case 6:
-                        text = 'Sun';
-                        break;
-                      default:
-                        text = '';
-                    }
-                    break;
-                  case "monthly":
-                    if (value.toInt() % 5 == 0) {
-                      text = '${value.toInt() + 1}';
-                    }
-                    break;
-                }
                 return Text(
-                  text,
-                  style: const TextStyle(
-                    color: Colors.grey,
-                    fontSize: 10,
-                  ),
+                  _getBottomTitle(value.toInt()),
+                  style: const TextStyle(color: Colors.grey, fontSize: 10),
                 );
               },
             ),
@@ -113,79 +50,104 @@ class _StepsActivityChartState extends State<StepsActivityChart> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              getTitlesWidget: (value, meta) {
-                // Only show some values for cleaner appearance
-                double highestSteps = _calculateMaxY();
-
-                // Only show the highest step count as a label
-                if (value == highestSteps) {
-                  return Text(
-                    '${value.toInt()}',
-                    style: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  );
-                }
-                return const Text('');
-              },
               reservedSize: 30,
+              getTitlesWidget: (value, meta) {
+                double highestSteps = _calculateMaxY();
+                return value == highestSteps
+                    ? Text(
+                        '${value.toInt()}',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    : const Text('');
+              },
             ),
           ),
-          topTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
-          rightTitles: const AxisTitles(
-            sideTitles: SideTitles(showTitles: false),
-          ),
+          topTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles:
+              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
           getDrawingHorizontalLine: (value) {
-            return FlLine(
-              color: Colors.grey.withOpacity(0.2),
-              strokeWidth: 1,
-            );
+            return FlLine(color: Colors.grey.withOpacity(0.2), strokeWidth: 1);
           },
         ),
-        borderData: FlBorderData(
-          show: false,
-        ),
+        borderData: FlBorderData(show: false),
         barGroups: _buildBarGroups(),
         maxY: _calculateMaxY(),
       ),
     );
   }
 
-  // Dynamic calculation of maxY based on step data
-  double _calculateMaxY() {
-    if (widget.dailySteps.isEmpty) return 0; // Default minimum value
-
-    double highestSteps =
-        widget.dailySteps.reduce((a, b) => a > b ? a : b).toDouble();
-
-    return (highestSteps <= 0)
-        ? 0
-        : highestSteps; // Show only the highest steps
+  /// 📌 **Get x-axis labels for daily or monthly views**
+  String _getBottomTitle(int index) {
+    if (widget.timeFrame == "daily") {
+      switch (index) {
+        case 0:
+          return '12AM';
+        case 4:
+          return '4AM';
+        case 8:
+          return '8AM';
+        case 12:
+          return '12PM';
+        case 16:
+          return '4PM';
+        case 20:
+          return '8PM';
+        default:
+          return '';
+      }
+    } else if (widget.timeFrame == "monthly") {
+      switch (index) {
+        case 0:
+          return 'Week 1';
+        case 1:
+          return 'Week 2';
+        case 2:
+          return 'Week 3';
+        case 3:
+          return 'Week 4';
+        default:
+          return '';
+      }
+    }
+    return '';
   }
 
-  List<BarChartGroupData> _buildBarGroups() {
-    double maxSteps = widget.dailySteps.isNotEmpty
-        ? widget.dailySteps.reduce((a, b) => a > b ? a : b).toDouble()
-        : 1000;
+  /// 📌 **Calculate maxY dynamically to fit the highest step count**
+  double _calculateMaxY() {
+    if (widget.stepsData.isEmpty) return 1000; // Default minimum
 
-    return List.generate(widget.dailySteps.length, (index) {
-      double scaledValue =
-          (widget.dailySteps[index] / maxSteps) * _calculateMaxY();
+    double highestSteps =
+        widget.stepsData.reduce((a, b) => a > b ? a : b).toDouble();
+
+    return (highestSteps > 0) ? (highestSteps * 1.2).ceilToDouble() : 1000;
+  }
+
+  /// 📌 **Build the bar chart groups dynamically**
+  List<BarChartGroupData> _buildBarGroups() {
+    double maxSteps = widget.stepsData.isNotEmpty
+        ? widget.stepsData.reduce((a, b) => a > b ? a : b).toDouble()
+        : 1; // Avoid zero-division
+
+    return List.generate(widget.stepsData.length, (index) {
+      double scaledValue = (maxSteps > 0)
+          ? (widget.stepsData[index] / maxSteps) * _calculateMaxY()
+          : 0;
 
       return BarChartGroupData(
         x: index,
         barRods: [
           BarChartRodData(
-            toY: scaledValue, // Adjusted value to ensure correct height
-            color: _getBarColor(widget.dailySteps[index]),
+            toY: scaledValue.isFinite ? scaledValue : 0, // Avoid NaN
+            color: _getBarColor(widget.stepsData[index]),
             width: widget.timeFrame == "daily" ? 8 : 16,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(6),
@@ -197,7 +159,7 @@ class _StepsActivityChartState extends State<StepsActivityChart> {
     });
   }
 
-  // Color bars based on activity level
+  /// 📌 **Color bars based on activity level**
   Color _getBarColor(int steps) {
     if (steps < 500) return Colors.red;
     if (steps < 2000) return Colors.orange;

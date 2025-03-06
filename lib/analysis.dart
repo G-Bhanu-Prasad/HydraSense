@@ -24,6 +24,7 @@ class AnalysisPageState extends State<AnalysisPage> {
   DateTime selectedDate = DateTime.now();
   List<int> hourlySteps = List.generate(24, (index) => 0);
   List<int> dailySteps = List.generate(7, (index) => 0);
+  List<int> monthlySteps = List.generate(4, (index) => 0);
 
   @override
   void initState() {
@@ -62,9 +63,15 @@ class AnalysisPageState extends State<AnalysisPage> {
       weekly.add(prefs.getInt(key) ?? 0);
     }
 
+    List<int> monthly = List.generate(4, (week) {
+      String key = "steps_${now.year}_${now.month}_week${week + 1}";
+      return prefs.getInt(key) ?? 0;
+    });
+
     setState(() {
       hourlySteps = hourly;
       dailySteps = weekly.reversed.toList();
+      monthlySteps = monthly;
     });
   }
 
@@ -291,7 +298,7 @@ class AnalysisPageState extends State<AnalysisPage> {
                 '${(hourlySteps.reduce((a, b) => a + b) / hourlySteps.length).round()} steps/hr',
             valueColor: Colors.pink,
             chart: StepsActivityChart(
-              dailySteps: hourlySteps,
+              stepsData: hourlySteps,
               timeFrame: "daily",
             ),
           ),
@@ -377,13 +384,13 @@ class AnalysisPageState extends State<AnalysisPage> {
           ),
           SizedBox(height: 10),
           _buildGraphContainer(
-            title: 'DAILY STEPS',
+            title: 'MONTHLY STEPS',
             value:
-                '${(dailySteps.reduce((a, b) => a + b) / dailySteps.length).round()} steps/day',
+                '${(monthlySteps.reduce((a, b) => a + b) / monthlySteps.length).round()} steps/week',
             valueColor: Colors.pink,
             chart: StepsActivityChart(
-              dailySteps: dailySteps,
-              timeFrame: "weekly",
+              stepsData: monthlySteps,
+              timeFrame: "monthly",
             ),
           ),
           SizedBox(height: 10),

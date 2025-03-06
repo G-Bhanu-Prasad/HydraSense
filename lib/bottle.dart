@@ -13,15 +13,28 @@ class BottlePage extends StatefulWidget {
   BottlePageState createState() => BottlePageState();
 }
 
-class BottlePageState extends State<BottlePage> {
+class BottlePageState extends State<BottlePage>
+    with SingleTickerProviderStateMixin {
   List<ScanResult> scanResults = [];
   bool isScanning = false;
   bool isBluetoothOn = false;
   Map<String, int> dailyIntakes = {};
+  late AnimationController _pulseAnimationController;
+  late Animation<double> _pulseAnimation;
 
   @override
   void initState() {
     super.initState();
+    _pulseAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(
+          parent: _pulseAnimationController, curve: Curves.easeInOut),
+    );
+
     _startScanning();
     _checkBluetoothStatus();
     _loadDailyIntakes();
@@ -80,29 +93,16 @@ class BottlePageState extends State<BottlePage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.blueGrey.shade200,
-        title: Text(
-          'Bluetooth Not Supported',
-          style: TextStyle(
-            color: Color.fromARGB(255, 9, 47, 103),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Text(
-          'This device does not support Bluetooth functionality.',
-          style: TextStyle(
-            color: Colors.blueGrey.shade800,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+      builder: (context) => _buildCustomDialog(
+        title: 'Bluetooth Not Supported',
+        content: 'This device does not support Bluetooth functionality.',
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
+            child: const Text(
               'OK',
               style: TextStyle(
-                color: Color.fromARGB(255, 9, 47, 103),
+                color: Color(0xFF1A73E8),
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -116,22 +116,10 @@ class BottlePageState extends State<BottlePage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.blueGrey.shade200,
-        title: Text(
-          'Enable Bluetooth',
-          style: TextStyle(
-            color: Color.fromARGB(255, 9, 47, 103),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Text(
-          'Bluetooth is required to connect to your smart bottle. Would you like to enable it?',
-          style: TextStyle(
-            color: Colors.blueGrey.shade800,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
+      builder: (context) => _buildCustomDialog(
+        title: 'Enable Bluetooth',
+        content:
+            'Bluetooth is required to connect to your smart bottle. Would you like to enable it?',
         actions: [
           TextButton(
             onPressed: () async {
@@ -140,34 +128,115 @@ class BottlePageState extends State<BottlePage> {
                 await FlutterBluePlus.turnOn();
               } catch (e) {
                 print('Error turning on Bluetooth: $e');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                        'Failed to enable Bluetooth. Please enable it manually.'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
+                _showSnackBar(
+                    'Failed to enable Bluetooth. Please enable it manually.',
+                    isError: true);
               }
             },
-            child: Text(
+            child: const Text(
               'Enable',
               style: TextStyle(
-                color: Color.fromARGB(255, 9, 47, 103),
+                color: Color(0xFF1A73E8),
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text(
+            child: const Text(
               'Cancel',
               style: TextStyle(
-                color: Color.fromARGB(255, 9, 47, 103),
+                color: Colors.grey,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildCustomDialog({
+    required String title,
+    required String content,
+    required List<Widget> actions,
+  }) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E2746),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
+          border: Border.all(
+            color: Colors.blue.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.blue.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.bluetooth,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              content,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey.shade300,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: actions,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red.shade700 : Colors.green.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        margin: const EdgeInsets.all(10),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -199,17 +268,23 @@ class BottlePageState extends State<BottlePage> {
   }
 
   Widget _buildDeviceIndicator(double angle, ScanResult result) {
-    final double radius = 140; // Radius for device indicators
+    final double radius = 140;
     final double x = radius * math.cos(angle);
     final double y = radius * math.sin(angle);
 
     String deviceName = result.device.platformName.isNotEmpty
         ? result.device.platformName
-        : 'Unknown Device';
-    // Truncate name if too long
+        : 'Unknown';
+
     if (deviceName.length > 12) {
       deviceName = '${deviceName.substring(0, 10)}...';
     }
+
+    final signalStrength = ((result.rssi + 100) / 50).clamp(0.0, 1.0);
+    final Color indicatorColor = ColorTween(
+      begin: Colors.red.shade700,
+      end: Colors.green,
+    ).lerp(signalStrength)!;
 
     return Transform.translate(
       offset: Offset(x, y),
@@ -218,43 +293,80 @@ class BottlePageState extends State<BottlePage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.8),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
-                    spreadRadius: 2,
-                    blurRadius: 4,
+            AnimatedBuilder(
+              animation: _pulseAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale:
+                      result == scanResults.first ? _pulseAnimation.value : 1.0,
+                  child: Container(
+                    width: 45,
+                    height: 45,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          indicatorColor.withOpacity(0.8),
+                          indicatorColor.withOpacity(0.4),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
+                      // boxShadow: [
+                      //   BoxShadow(
+                      //     color: indicatorColor.withOpacity(0.5),
+                      //     spreadRadius: 2,
+                      //     blurRadius: 6,
+                      //   ),
+                      // ],
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Icon(
+                              Icons.water_drop,
+                              color: Colors.white.withOpacity(0.9),
+                              size: 26,
+                            ),
+                            Positioned(
+                              right: 6,
+                              bottom: 6,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: Colors.greenAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.water_drop,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ],
-              ),
+                );
+              },
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.white.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.2),
+                  width: 1,
+                ),
               ),
               child: Text(
                 deviceName,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
@@ -269,61 +381,186 @@ class BottlePageState extends State<BottlePage> {
   }
 
   void _showDeviceInfo(ScanResult result) {
+    String deviceName = result.device.platformName.isNotEmpty
+        ? result.device.platformName
+        : 'Unknown';
+
+    // Signal strength in percentage
+    final signalPercentage = ((result.rssi + 100) / 50).clamp(0.0, 1.0) * 100;
+    final Color signalColor = signalPercentage > 50
+        ? Colors.greenAccent
+        : (signalPercentage > 25 ? Colors.orangeAccent : Colors.redAccent);
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.blueGrey.shade200,
-        title: Text(
-          result.device.platformName.isNotEmpty
-              ? result.device.platformName
-              : 'Unknown Device',
-          style: TextStyle(
-            color: Color.fromARGB(255, 9, 47, 103),
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Signal Strength: ${result.rssi} dBm',
-              style: TextStyle(
-                color: Colors.blueGrey.shade800,
-                fontWeight: FontWeight.w500,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E2746),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 5),
               ),
-            ),
-            Text(
-              'ID: ${result.device.remoteId}',
-              style: TextStyle(
-                color: Colors.blueGrey.shade800,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _pairAndConnectDevice(result.device);
-            },
-            child: Text(
-              'Connect',
-              style: TextStyle(
-                color: Color.fromARGB(255, 9, 47, 103),
-                fontWeight: FontWeight.w600,
-              ),
+            ],
+            border: Border.all(
+              color: Colors.blue.withOpacity(0.3),
+              width: 1,
             ),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancel',
-              style: TextStyle(
-                color: Color.fromARGB(255, 9, 47, 103),
-                fontWeight: FontWeight.w600,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.blue.withOpacity(0.8),
+                      Colors.blue.withOpacity(0.4),
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.water_drop,
+                  color: Colors.white,
+                  size: 32,
+                ),
               ),
+              const SizedBox(height: 16),
+              Text(
+                deviceName,
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 24),
+              _buildDeviceInfoRow(
+                icon: Icons.signal_cellular_alt,
+                title: 'Signal Strength',
+                value: '${signalPercentage.toInt()}%',
+                valueColor: signalColor,
+              ),
+              const Divider(height: 24, color: Colors.white10),
+              _buildDeviceInfoRow(
+                icon: Icons.fingerprint,
+                title: 'Device ID',
+                value: result.device.remoteId.toString(),
+                valueColor: Colors.white70,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _pairAndConnectDevice(result.device);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A73E8),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Connect',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white10,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 16, horizontal: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: const Text(
+                      'Cancel',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceInfoRow({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color valueColor,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white70,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: valueColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -332,22 +569,42 @@ class BottlePageState extends State<BottlePage> {
   }
 
   Future<void> _pairAndConnectDevice(BluetoothDevice device) async {
+    // Show connecting dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+              SizedBox(height: 20),
+              Text(
+                'Connecting...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
     try {
       await device.createBond();
       await device.connect();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Connected to ${device.platformName}'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      Navigator.pop(context); // Dismiss connecting dialog
+      _showSnackBar('Connected to ${device.platformName}');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to connect: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      Navigator.pop(context); // Dismiss connecting dialog
+      _showSnackBar('Failed to connect: $e', isError: true);
     }
   }
 
@@ -355,9 +612,10 @@ class BottlePageState extends State<BottlePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E21),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
         automaticallyImplyLeading: true,
-        backgroundColor: const Color(0xFF0A0E21),
+        backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         elevation: 0,
         leading: IconButton(
@@ -369,140 +627,258 @@ class BottlePageState extends State<BottlePage> {
             );
           },
         ),
-        title: Text(
-          '',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
         actions: [
           if (!isBluetoothOn)
             IconButton(
-              icon: Icon(Icons.bluetooth_disabled, color: Colors.white),
+              icon: const Icon(Icons.bluetooth_disabled, color: Colors.white),
               onPressed: _showEnableBluetoothDialog,
             ),
         ],
       ),
-      body: Column(
-        //mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          //const SizedBox(height: 50),
-          Text(
-            'Add your bottle',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 30,
-              fontWeight: FontWeight.bold,
-            ),
+      body: Container(
+        padding: EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              const Color(0xFF0A0E21),
+              const Color(0xFF0A0E21).withOpacity(0.9),
+              const Color(0xFF0A0E21).withOpacity(0.8),
+            ],
           ),
-          const SizedBox(height: 10),
-          Text(
-            isScanning
-                ? 'Scanning for nearby bottles...'
-                : scanResults.isEmpty
-                    ? 'No bottles found nearby'
-                    : '1 bottles found',
-            //: '${scanResults.length} bottles found',
-            style: TextStyle(
-              color: Colors.grey.shade300,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 40),
-          SizedBox(
-            width: 400,
-            height: 400,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Outer circles
-                Container(
-                  width: 320,
-                  height: 320,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.blue.withOpacity(0.3),
-                      width: 2,
-                    ),
-                  ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              const Text(
+                'Connect Your Bottle',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
                 ),
-                Container(
-                  width: 250,
-                  height: 250,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.blue.withOpacity(0.6),
-                      width: 2,
-                    ),
-                  ),
-                ),
-                Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.blue.withOpacity(0.8),
-                      width: 2,
-                    ),
-                  ),
-                ),
-                // Center Bluetooth icon with pulsing effect
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
+              ),
+              const SizedBox(height: 10),
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isScanning
+                      ? Colors.blue.withOpacity(0.2)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
                     color: isScanning
-                        ? Colors.blue.withOpacity(0.3)
-                        : Colors.cyan.shade800,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.bluetooth,
-                    color: Colors.white,
-                    size: 40,
+                        ? Colors.blue.withOpacity(0.5)
+                        : Colors.white.withOpacity(0.1),
+                    width: 1,
                   ),
                 ),
-                // Device indicators with names
-                if (scanResults.isNotEmpty)
-                  ...List.generate(
-                    math.min(scanResults.length, 1), // Limit to 8 devices
-                    (index) {
-                      final angle = (2 * math.pi * index) /
-                          math.min(scanResults.length, 8);
-                      return _buildDeviceIndicator(angle, scanResults[index]);
-                    },
-                  ),
-                if (isScanning)
-                  SizedBox(
-                    width: 320,
-                    height: 320,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.blue.withOpacity(0.3),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (isScanning)
+                      Container(
+                        width: 14,
+                        height: 14,
+                        margin: const EdgeInsets.only(right: 8),
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.blue),
+                        ),
+                      ),
+                    Text(
+                      isScanning
+                          ? 'Scanning for nearby bottles...'
+                          : scanResults.isEmpty
+                              ? 'No bottles found nearby'
+                              : '${scanResults.length} bottle${scanResults.length == 1 ? '' : 's'} found',
+                      style: TextStyle(
+                        color: isScanning ? Colors.blue : Colors.grey.shade300,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-          if (!isScanning)
-            ElevatedButton.icon(
-              onPressed: _startScanning,
-              icon: Icon(Icons.refresh),
-              label: Text('Scan Again'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
+                  ],
+                ),
               ),
-            ),
-        ],
+              const SizedBox(height: 20),
+              Expanded(
+                child: Center(
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width,
+                    height: 400,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Background glow
+                        Container(
+                          width: 340,
+                          height: 340,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: isScanning
+                                    ? Colors.blue.withOpacity(0.09)
+                                    : Colors.transparent,
+                                spreadRadius: 10,
+                                blurRadius: 60,
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Outer circle with animated gradient
+                        AnimatedBuilder(
+                          animation: _pulseAnimationController,
+                          builder: (context, child) {
+                            return Container(
+                              width: 320,
+                              height: 320,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: isScanning
+                                      ? Colors.blue.withOpacity(0.2 +
+                                          0.1 * _pulseAnimationController.value)
+                                      : Colors.blue.withOpacity(0.1),
+                                  width: 1.5,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                        Container(
+                          width: 250,
+                          height: 250,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.3),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        Container(
+                          width: 180,
+                          height: 180,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Colors.blue.withOpacity(0.4),
+                              width: 1.5,
+                            ),
+                          ),
+                        ),
+                        // Center Bluetooth icon with pulsing effect
+                        GestureDetector(
+                          onTap: isScanning ? null : _startScanning,
+                          child: AnimatedBuilder(
+                            animation: _pulseAnimation,
+                            builder: (context, child) {
+                              return Transform.scale(
+                                scale: isScanning ? _pulseAnimation.value : 1.0,
+                                child: Container(
+                                  width: 80,
+                                  height: 80,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        isScanning
+                                            ? Colors.blue.shade700
+                                            : const Color(0xFF1E2746),
+                                        isScanning
+                                            ? Colors.blue.shade900
+                                            : const Color(0xFF131B38),
+                                      ],
+                                    ),
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: isScanning
+                                            ? Colors.blue.withOpacity(0.5)
+                                            : Colors.black.withOpacity(0.3),
+                                        spreadRadius: 2,
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    isScanning
+                                        ? Icons.bluetooth_searching
+                                        : Icons.bluetooth,
+                                    color: isScanning
+                                        ? Colors.white
+                                        : Colors.blue.shade400,
+                                    size: 40,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        // Device indicators
+                        if (scanResults.isNotEmpty)
+                          ...List.generate(
+                            math.min(scanResults.length, 8),
+                            (index) {
+                              final angle = (2 * math.pi * index) /
+                                  math.min(scanResults.length, 8);
+                              return _buildDeviceIndicator(
+                                  angle, scanResults[index]);
+                            },
+                          ),
+                        // Scanning animation
+                        if (isScanning)
+                          Container(
+                            width: 320,
+                            height: 320,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.transparent),
+                            ),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.blue.withOpacity(0.5),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              if (!isScanning)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 40),
+                  child: ElevatedButton.icon(
+                    onPressed: _startScanning,
+                    icon: const Icon(Icons.refresh, size: 20),
+                    label: const Text('Scan Again'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A73E8),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: 1,
@@ -513,6 +889,7 @@ class BottlePageState extends State<BottlePage> {
 
   @override
   void dispose() {
+    _pulseAnimationController.dispose();
     FlutterBluePlus.stopScan();
     super.dispose();
   }

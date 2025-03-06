@@ -71,17 +71,27 @@ class StepTrackerService {
     // Store hourly steps
     DateTime now = DateTime.now();
     String hourKey = "steps_${now.year}_${now.month}_${now.day}_${now.hour}";
-    String prevHourKey =
-        "steps_${now.year}_${now.month}_${now.day}_${now.hour - 1}";
     int lastSavedHour = prefs.getInt('lastSavedHour') ?? now.hour;
+
     if (lastSavedHour != now.hour) {
-      // If it's a new hour, reset the hourly step count
-      prefs.setInt(hourKey, 0);
+      prefs.setInt(hourKey, 0); // Reset hourly steps
       prefs.setInt('lastSavedHour', now.hour);
     }
+
     int previousSteps = prefs.getInt(hourKey) ?? 0;
-    _dailySteps = event.steps - _startSteps;
     prefs.setInt(hourKey, previousSteps + (_dailySteps - previousSteps));
+
+    // Store weekly steps (corrected)
+    int weekNumber = ((now.day - 1) ~/ 7) + 1; // Week 1 to Week 4
+    String weekKey = "steps_${now.year}_${now.month}_week$weekNumber";
+    String lastUpdatedKey = "last_updated_week_$weekNumber";
+    String savedDate = prefs.getString(lastUpdatedKey) ?? "";
+
+    if (savedDate != now.toIso8601String().split('T')[0]) {
+      int previousWeekSteps = prefs.getInt(weekKey) ?? 0;
+      prefs.setInt(weekKey, previousWeekSteps + _dailySteps);
+      prefs.setString(lastUpdatedKey, now.toIso8601String().split('T')[0]);
+    }
   }
 
   void _onStepCountError(dynamic error) {
