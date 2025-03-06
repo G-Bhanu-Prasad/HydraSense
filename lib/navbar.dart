@@ -51,8 +51,9 @@ class BottomNavBar extends StatelessWidget {
               Navigator.pushReplacement(
                 context,
                 MaterialPageRoute(
-                    builder: (context) =>
-                        AnalysisPage(dailyIntakes: dailyIntakes!)),
+                    builder: (context) => AnalysisPage(
+                          dailyIntakes: dailyIntakes!,
+                        )),
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(

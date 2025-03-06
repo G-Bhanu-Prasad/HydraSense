@@ -51,27 +51,30 @@ class _NameInputScreenState extends State<NameInputScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E21),
       //backgroundColor: const Color(0xFF0A1929),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0A0E21),
+        elevation: 0,
+        // toolbarHeight: 15,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new,
+              color: Colors.white.withOpacity(0.7), size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'HydraSense',
+          style: GoogleFonts.pacifico(
+            fontSize: 30,
+            fontWeight: FontWeight.w300,
+            color: Colors.white,
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const SizedBox(height: 40),
-            Text(
-              'HydraSense',
-              style: GoogleFonts.pacifico(
-                fontSize: 30,
-                fontWeight: FontWeight.w300,
-                color: Colors.white,
-              ),
-            ),
-            // const Text(
-            //   'Stay hydrated, stay healthy!',
-            //   style: TextStyle(
-            //     fontSize: 16,
-            //     color: Colors.grey,
-            //   ),
-            // ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 20),
             // Progress indicators
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -81,7 +84,7 @@ class _NameInputScreenState extends State<NameInputScreen> {
                   height: 4,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   decoration: BoxDecoration(
-                    color: index < 1 ? Colors.blue : Colors.grey.shade700,
+                    color: index < 1 ? Colors.blue : Colors.black,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 );

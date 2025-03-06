@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_application_2/profilescreens.dart/login.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_2/notification_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_application_2/profilescreens.dart/name.dart';
 import 'package:flutter_application_2/home_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
+//import 'package:flutter_application_2/profilescreens.dart/logo.dart';
 
 Future<void> requestExactAlarmPermission() async {
   if (await Permission.scheduleExactAlarm.isDenied) {
@@ -59,34 +61,47 @@ class ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _markUserAsNotFirstTime();
+    //_markUserAsNotFirstTime();
   }
 
-  Future<void> _markUserAsNotFirstTime() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isFirstTimeUser', false);
-  }
+  // Future<void> _markUserAsNotFirstTime() async {
+  //   SharedPreferences prefs = await SharedPreferences.getInstance();
+  //   await prefs.setBool('isFirstTimeUser', false);
+  // }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E21),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0A0E21),
+        title: Text(
+          'HydraSense',
+          style: GoogleFonts.pacifico(
+            fontSize: 30,
+            fontWeight: FontWeight.w300,
+            color: Colors.white,
+          ),
+        ),
+        centerTitle: true,
+      ),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(18.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                'HydraSense',
-                style: GoogleFonts.pacifico(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w400,
-                  color: Colors.white,
-                ),
-              ),
               Image.asset("lib/images/wel.png"),
-              const SizedBox(height: 15),
+              // const HydraSenseLogo(
+              //   size: 300,
+              //   showText: true,
+              // ),
+              // const HydraSenseLogo(
+              //   size: 180,
+              //   animate: false,
+              // ),
+
+              const SizedBox(height: 40),
               RichText(
                 textAlign: TextAlign.center,
                 text: TextSpan(
@@ -163,7 +178,14 @@ class ProfileScreenState extends State<ProfileScreen> {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const LoginPage(),
+                      ),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     shadowColor: Colors.transparent,

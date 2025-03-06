@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:math' as math;
 import 'navbar.dart';
 import 'home_screen.dart';
+import 'dart:convert';
 
 class BottlePage extends StatefulWidget {
   const BottlePage({super.key});
@@ -15,12 +17,25 @@ class BottlePageState extends State<BottlePage> {
   List<ScanResult> scanResults = [];
   bool isScanning = false;
   bool isBluetoothOn = false;
+  Map<String, int> dailyIntakes = {};
 
   @override
   void initState() {
     super.initState();
     _startScanning();
     _checkBluetoothStatus();
+    _loadDailyIntakes();
+  }
+
+  Future<void> _loadDailyIntakes() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? dailyIntakesJson = prefs.getString('dailyIntakes');
+
+    if (dailyIntakesJson != null) {
+      setState(() {
+        dailyIntakes = Map<String, int>.from(jsonDecode(dailyIntakesJson));
+      });
+    }
   }
 
   Future<void> _checkBluetoothStatus() async {
@@ -491,7 +506,7 @@ class BottlePageState extends State<BottlePage> {
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: 1,
-        //dailyIntakes: dailyIntakes,
+        dailyIntakes: dailyIntakes,
       ),
     );
   }

@@ -79,6 +79,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
   late DateTime lastStreakDate;
   String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
   Map<String, int> dailyIntakes = {};
+  Map<String, Map<String, int>> hourlyIntakes = {};
+  Map<String, Map<String, int>> hourlySteps = {};
   String userName = '';
   bool isLoading = true;
   String weatherDescription = '';
@@ -102,6 +104,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
       });
     });
     loadDailyData();
+    loadHourlySteps();
+    loadHourlyIntakes();
     _loadDailyGoal();
     getCurrentLocation();
     _requestLocationPermission();
@@ -115,10 +119,16 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
         steps = StepTrackerService().dailySteps;
       });
 
-      // Update hydration messages dynamically
-      Timer.periodic(Duration(seconds: 1), (timer) {
+      Timer.periodic(const Duration(seconds: 1), (timer) {
+        int currentSteps = StepTrackerService().dailySteps;
+
+        if (currentSteps > steps) {
+          int stepsDifference = currentSteps - steps;
+          updateHourlySteps(stepsDifference); // Update hourly steps
+        }
+
         setState(() {
-          steps = StepTrackerService().dailySteps;
+          steps = currentSteps;
         });
       });
     });
@@ -463,6 +473,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
       dailyIntakes[selectedDate] = dailyIntake;
     });
     //changed
+    await updateHourlyIntake(amount);
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('lastWaterIntake', DateTime.now().toIso8601String());
     updateDailyIntake(dailyIntake);
@@ -609,6 +620,53 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> loadHourlyIntakes() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? jsonString = prefs.getString('hourlyIntakes');
+    if (jsonString != null) {
+      Map<String, dynamic> decoded = jsonDecode(jsonString);
+      hourlyIntakes = decoded
+          .map((date, hours) => MapEntry(date, Map<String, int>.from(hours)));
+    }
+  }
+
+  Future<void> updateHourlyIntake(int amount) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    String hour = DateFormat('HH').format(DateTime.now());
+
+    if (!hourlyIntakes.containsKey(date)) {
+      hourlyIntakes[date] = {};
+    }
+
+    hourlyIntakes[date]![hour] = (hourlyIntakes[date]![hour] ?? 0) + amount;
+    await prefs.setString('hourlyIntakes', jsonEncode(hourlyIntakes));
+  }
+
+  Future<void> updateHourlySteps(int stepsCount) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String date = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    String hour = DateFormat("HH").format(DateTime.now());
+    if (!hourlySteps.containsKey(date)) {
+      hourlySteps[date] = {};
+    }
+    hourlySteps[date]![hour] = (hourlySteps[date]![hour] ?? 0) + stepsCount;
+    await prefs.setString('hourlySteps', jsonEncode(hourlySteps));
+  }
+
+  Future<void> loadHourlySteps() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? jsonString = prefs.getString('hourlySteps');
+    if (jsonString != null) {
+      Map<String, dynamic> decoded = jsonDecode(jsonString);
+      setState(() {
+        hourlySteps = decoded.map(
+          (date, hours) => MapEntry(date, Map<String, int>.from(hours)),
+        );
+      });
+    }
   }
 
   @override

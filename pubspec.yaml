@@ -86,7 +86,7 @@ flutter:
     - lib/images/image.png
     - lib/images/welcomeback.png
     - lib/images/wel.png
-
+    - lib/images/forgot.png
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

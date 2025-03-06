@@ -7,6 +7,7 @@ import 'navbar.dart';
 import 'home_screen.dart';
 import 'dart:convert';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_application_2/profilescreens.dart/changepass.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -380,7 +381,13 @@ class _ProfilePageState extends State<ProfilePage> {
                             icon: Icons.password_rounded,
                             title: 'Change Password',
                             trailing: null,
-                            onTap: () {},
+                            onTap: () {
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                    builder: (context) => ChangePasswordPage()),
+                              );
+                            },
                           ),
                         ],
                       ),

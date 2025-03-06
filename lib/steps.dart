@@ -67,6 +67,21 @@ class StepTrackerService {
     _dailySteps = event.steps - _startSteps;
     _distance = (_dailySteps * _strideLength) / 1000;
     _calories = _dailySteps * _caloriesPerStep;
+
+    // Store hourly steps
+    DateTime now = DateTime.now();
+    String hourKey = "steps_${now.year}_${now.month}_${now.day}_${now.hour}";
+    String prevHourKey =
+        "steps_${now.year}_${now.month}_${now.day}_${now.hour - 1}";
+    int lastSavedHour = prefs.getInt('lastSavedHour') ?? now.hour;
+    if (lastSavedHour != now.hour) {
+      // If it's a new hour, reset the hourly step count
+      prefs.setInt(hourKey, 0);
+      prefs.setInt('lastSavedHour', now.hour);
+    }
+    int previousSteps = prefs.getInt(hourKey) ?? 0;
+    _dailySteps = event.steps - _startSteps;
+    prefs.setInt(hourKey, previousSteps + (_dailySteps - previousSteps));
   }
 
   void _onStepCountError(dynamic error) {

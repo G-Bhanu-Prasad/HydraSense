@@ -42,7 +42,7 @@ class HeightSelectorScreenState extends State<HeightSelectorScreen> {
                     height: 4,
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     decoration: BoxDecoration(
-                      color: index < 4 ? Colors.blue : Colors.grey.shade700,
+                      color: index < 4 ? Colors.blue : Colors.black,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   );

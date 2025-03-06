@@ -62,7 +62,7 @@ class PieChartSample extends StatelessWidget {
         value: totalGoalsMet.toDouble(),
         color: Colors.green,
         title: '$totalGoalsMet',
-        radius: 45,
+        radius: 35,
         titleStyle: const TextStyle(
             fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
       ),
@@ -70,7 +70,7 @@ class PieChartSample extends StatelessWidget {
         value: totalIncompleteGoals.toDouble(),
         color: Colors.red,
         title: '$totalIncompleteGoals',
-        radius: 40,
+        radius: 35,
         titleStyle: const TextStyle(
             fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
       ),
@@ -110,7 +110,8 @@ class PieChartSample extends StatelessWidget {
         const SizedBox(width: 8),
         Text(
           text,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+              fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white54),
         ),
       ],
     );
