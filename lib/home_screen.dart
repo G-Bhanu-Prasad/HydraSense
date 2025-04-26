@@ -562,7 +562,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     String dailyIntakesJson = jsonEncode(dailyIntakes);
     await prefs.setString('dailyIntakes', dailyIntakesJson);
 
-    if (dailyIntake >= defaultGoal && !goalMetToday) {
+    if (dailyIntake >= dailyGoal && !goalMetToday) {
       checkStreak(prefs);
     }
   }

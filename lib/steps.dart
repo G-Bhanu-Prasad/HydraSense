@@ -58,39 +58,54 @@ class StepTrackerService {
   void _onStepCount(StepCount event) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
+    DateTime now = DateTime.now();
+    String hourKey = "steps_${now.year}_${now.month}_${now.day}_${now.hour}";
+    String hourStartStepsKey =
+        "hour_start_steps_${now.year}_${now.month}_${now.day}_${now.hour}";
+
+    // Initialize starting step count for the day
     if (_startSteps == 0) {
       _startSteps = event.steps;
       prefs.setInt('startSteps', _startSteps);
-      prefs.setString('lastSavedDate', DateTime.now().toIso8601String());
+      prefs.setString('lastSavedDate', now.toIso8601String());
     }
 
-    _dailySteps = event.steps - _startSteps;
+    int currentSteps = event.steps;
+
+    // Set today's total steps
+    _dailySteps = currentSteps - _startSteps;
+    prefs.setInt("steps_${now.year}_${now.month}_${now.day}", _dailySteps);
+
     _distance = (_dailySteps * _strideLength) / 1000;
     _calories = _dailySteps * _caloriesPerStep;
 
-    // Store hourly steps
-    DateTime now = DateTime.now();
-    String hourKey = "steps_${now.year}_${now.month}_${now.day}_${now.hour}";
-    int lastSavedHour = prefs.getInt('lastSavedHour') ?? now.hour;
-
-    if (lastSavedHour != now.hour) {
-      prefs.setInt(hourKey, 0); // Reset hourly steps
-      prefs.setInt('lastSavedHour', now.hour);
+    // Hourly logic
+    int? hourStartSteps = prefs.getInt(hourStartStepsKey);
+    if (hourStartSteps == null) {
+      // First time in this hour – set the starting steps for this hour
+      prefs.setInt(hourStartStepsKey, currentSteps);
+      hourStartSteps = currentSteps;
     }
 
-    int previousSteps = prefs.getInt(hourKey) ?? 0;
-    prefs.setInt(hourKey, previousSteps + (_dailySteps - previousSteps));
+    int hourlySteps = currentSteps - hourStartSteps;
 
-    // Store weekly steps (corrected)
-    int weekNumber = ((now.day - 1) ~/ 7) + 1; // Week 1 to Week 4
+    // Save hourly steps
+    prefs.setInt(hourKey, hourlySteps);
+
+    // Optional: Save the hourStartSteps for debugging or reference
+    prefs.setInt('lastSavedHour', now.hour);
+
+    // Weekly tracking
+    int weekNumber = ((now.day - 1) ~/ 7) + 1;
     String weekKey = "steps_${now.year}_${now.month}_week$weekNumber";
     String lastUpdatedKey = "last_updated_week_$weekNumber";
     String savedDate = prefs.getString(lastUpdatedKey) ?? "";
 
-    if (savedDate != now.toIso8601String().split('T')[0]) {
+    String todayStr = now.toIso8601String().split('T')[0];
+    if (savedDate != todayStr) {
       int previousWeekSteps = prefs.getInt(weekKey) ?? 0;
       prefs.setInt(weekKey, previousWeekSteps + _dailySteps);
-      prefs.setString(lastUpdatedKey, now.toIso8601String().split('T')[0]);
+      prefs.setString(lastUpdatedKey, todayStr);
     }
   }
 

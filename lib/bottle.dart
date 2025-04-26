@@ -5,6 +5,8 @@ import 'dart:math' as math;
 import 'navbar.dart';
 import 'home_screen.dart';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'distancescreen.dart';
 
 class BottlePage extends StatefulWidget {
   const BottlePage({super.key});
@@ -21,6 +23,7 @@ class BottlePageState extends State<BottlePage>
   Map<String, int> dailyIntakes = {};
   late AnimationController _pulseAnimationController;
   late Animation<double> _pulseAnimation;
+  int? connectedDistance;
 
   @override
   void initState() {
@@ -247,15 +250,27 @@ class BottlePageState extends State<BottlePage>
       scanResults.clear();
     });
 
+    const targetDeviceId = '64:E833:85:7E:1E';
+
     try {
-      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 4));
-      FlutterBluePlus.scanResults.listen((results) {
+      FlutterBluePlus.scanResults.listen((results) async {
+        for (var result in results) {
+          final scannedId = result.device.remoteId.toString().toUpperCase();
+          if (scannedId == targetDeviceId) {
+            FlutterBluePlus.stopScan();
+            await _pairAndConnectDevice(result.device);
+            return;
+          }
+        }
+
         setState(() {
           scanResults = results;
         });
       });
 
-      await Future.delayed(const Duration(seconds: 4));
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 6));
+
+      await Future.delayed(const Duration(seconds: 6));
       setState(() {
         isScanning = false;
       });
@@ -569,7 +584,6 @@ class BottlePageState extends State<BottlePage>
   }
 
   Future<void> _pairAndConnectDevice(BluetoothDevice device) async {
-    // Show connecting dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -586,10 +600,7 @@ class BottlePageState extends State<BottlePage>
               SizedBox(height: 20),
               Text(
                 'Connecting...',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 16),
               ),
             ],
           ),
@@ -598,12 +609,39 @@ class BottlePageState extends State<BottlePage>
     );
 
     try {
-      await device.createBond();
-      await device.connect();
-      Navigator.pop(context); // Dismiss connecting dialog
-      _showSnackBar('Connected to ${device.platformName}');
+      await device.connect(timeout: const Duration(seconds: 10));
+
+      // ✅ Discover and get services
+      final services = await device.discoverServices();
+
+      final targetService = services.firstWhere(
+        (s) =>
+            s.serviceUuid.toString().toLowerCase() ==
+            "19b10000-e8f2-537e-4f6c-d104768a1214",
+        orElse: () => throw Exception("Target service not found"),
+      );
+
+      final targetCharacteristic = targetService.characteristics.firstWhere(
+        (c) =>
+            c.characteristicUuid.toString().toLowerCase() ==
+            "19b10001-e8f2-537e-4f6c-d104768a1214",
+        orElse: () => throw Exception("Target characteristic not found"),
+      );
+
+      await targetCharacteristic.setNotifyValue(true);
+
+      Navigator.pop(context); // dismiss dialog
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => DistanceScreen(
+            device: device,
+            characteristic: targetCharacteristic,
+          ),
+        ),
+      );
     } catch (e) {
-      Navigator.pop(context); // Dismiss connecting dialog
+      Navigator.pop(context); // dismiss dialog
       _showSnackBar('Failed to connect: $e', isError: true);
     }
   }
@@ -661,6 +699,18 @@ class BottlePageState extends State<BottlePage>
                   letterSpacing: 0.5,
                 ),
               ),
+              if (connectedDistance != null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    'Distance: $connectedDistance mm',
+                    style: const TextStyle(
+                      color: Colors.greenAccent,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
               const SizedBox(height: 10),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 40),

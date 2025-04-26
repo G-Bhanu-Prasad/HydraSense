@@ -86,7 +86,9 @@ class MonthlyWaterIntakeChart extends StatelessWidget {
 }
 
 class HourlyWaterIntakeChart extends StatefulWidget {
-  const HourlyWaterIntakeChart({super.key});
+  final DateTime? selectedDate;
+
+  const HourlyWaterIntakeChart({super.key, this.selectedDate});
 
   @override
   _HourlyWaterIntakeChartState createState() => _HourlyWaterIntakeChartState();
@@ -94,6 +96,7 @@ class HourlyWaterIntakeChart extends StatefulWidget {
 
 class _HourlyWaterIntakeChartState extends State<HourlyWaterIntakeChart> {
   List<int> hourlyIntakes = List.filled(24, 0);
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -101,28 +104,55 @@ class _HourlyWaterIntakeChartState extends State<HourlyWaterIntakeChart> {
     _loadHourlyIntakes();
   }
 
+  @override
+  void didUpdateWidget(HourlyWaterIntakeChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Check if the selected date has changed
+    if (widget.selectedDate != oldWidget.selectedDate) {
+      _loadHourlyIntakes();
+    }
+  }
+
   Future<void> _loadHourlyIntakes() async {
+    setState(() {
+      isLoading = false;
+    });
+
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // Use the selected date if provided, otherwise use today's date
+    DateTime dateToLoad = widget.selectedDate ?? DateTime.now();
+    String formattedDate = DateFormat('yyyy-MM-dd').format(dateToLoad);
+
     String? jsonString = prefs.getString('hourlyIntakes');
 
     if (jsonString != null) {
       Map<String, dynamic> decoded = jsonDecode(jsonString);
-      Map<String, int> todayHourly = decoded[todayDate] != null
-          ? Map<String, int>.from(decoded[todayDate])
+      Map<String, int> dayHourly = decoded[formattedDate] != null
+          ? Map<String, int>.from(decoded[formattedDate])
           : {};
 
       setState(() {
         hourlyIntakes = List.generate(
           24,
-          (hour) => todayHourly[hour.toString().padLeft(2, '0')] ?? 0,
+          (hour) => dayHourly[hour.toString().padLeft(2, '0')] ?? 0,
         );
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        hourlyIntakes = List.filled(24, 0);
+        isLoading = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+
     double highestIntake =
         hourlyIntakes.reduce((a, b) => a > b ? a : b).toDouble();
     double maxY = (highestIntake <= 0)
@@ -232,7 +262,9 @@ class _HourlyWaterIntakeChartState extends State<HourlyWaterIntakeChart> {
 }
 
 class HourlyStepsChart extends StatefulWidget {
-  const HourlyStepsChart({super.key});
+  final DateTime? selectedDate;
+
+  const HourlyStepsChart({super.key, this.selectedDate});
 
   @override
   _HourlyStepsChartState createState() => _HourlyStepsChartState();
@@ -240,6 +272,7 @@ class HourlyStepsChart extends StatefulWidget {
 
 class _HourlyStepsChartState extends State<HourlyStepsChart> {
   List<int> hourlySteps = List.filled(24, 0); // Initialize with zeros
+  bool isLoading = true;
 
   @override
   void initState() {
@@ -247,28 +280,72 @@ class _HourlyStepsChartState extends State<HourlyStepsChart> {
     _loadHourlySteps();
   }
 
+  @override
+  void didUpdateWidget(HourlyStepsChart oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Check if the selected date has changed
+    if (widget.selectedDate != oldWidget.selectedDate) {
+      _loadHourlySteps();
+    }
+  }
+
   Future<void> _loadHourlySteps() async {
+    setState(() {
+      isLoading = true;
+    });
+
     SharedPreferences prefs = await SharedPreferences.getInstance();
-    String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+    // Use the selected date if provided, otherwise use today's date
+    DateTime dateToLoad = widget.selectedDate ?? DateTime.now();
+    String formattedDate = DateFormat('yyyy-MM-dd').format(dateToLoad);
+
+    // First try to load from hourlySteps JSON
     String? jsonString = prefs.getString('hourlySteps');
+    bool foundData = false;
 
     if (jsonString != null) {
       Map<String, dynamic> decoded = jsonDecode(jsonString);
-      Map<String, int> todayHourly = decoded[todayDate] != null
-          ? Map<String, int>.from(decoded[todayDate])
+      Map<String, int> dayHourly = decoded[formattedDate] != null
+          ? Map<String, int>.from(decoded[formattedDate])
           : {};
 
+      if (dayHourly.isNotEmpty) {
+        setState(() {
+          hourlySteps = List.generate(
+            24,
+            (hour) => dayHourly[hour.toString().padLeft(2, '0')] ?? 0,
+          );
+          foundData = true;
+        });
+      }
+    }
+
+    // If no data found in JSON, try loading from individual keys
+    if (!foundData) {
+      List<int> steps = List.filled(24, 0);
+      for (int hour = 0; hour < 24; hour++) {
+        String key =
+            "steps_${dateToLoad.year}_${dateToLoad.month}_${dateToLoad.day}_$hour";
+        steps[hour] = prefs.getInt(key) ?? 0;
+      }
+
       setState(() {
-        hourlySteps = List.generate(
-          24,
-          (hour) => todayHourly[hour.toString().padLeft(2, '0')] ?? 0,
-        );
+        hourlySteps = steps;
       });
     }
+
+    setState(() {
+      isLoading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return Center(child: CircularProgressIndicator());
+    }
+
     double highestSteps =
         hourlySteps.reduce((a, b) => a > b ? a : b).toDouble();
     double maxY =
@@ -289,13 +366,37 @@ class _HourlyStepsChartState extends State<HourlyStepsChart> {
                 reservedSize: 30,
                 interval: 1, // Show labels every 3 hours for readability
                 getTitlesWidget: (value, meta) {
-                  if (value % 2 == 0) {
+                  if (value % 4 == 0) {
+                    // Show only labels at 4-hour intervals
+                    String text = "";
+                    switch (value.toInt()) {
+                      case 0:
+                        text = "12AM";
+                        break;
+                      case 4:
+                        text = "4AM";
+                        break;
+                      case 8:
+                        text = "8AM";
+                        break;
+                      case 12:
+                        text = "12PM";
+                        break;
+                      case 16:
+                        text = "4PM";
+                        break;
+                      case 20:
+                        text = "8PM";
+                        break;
+                      default:
+                        text = "";
+                    }
                     return Text(
-                      '',
-                      style: TextStyle(fontSize: 10, color: Colors.white),
+                      text,
+                      style: const TextStyle(fontSize: 10, color: Colors.white),
                     );
                   }
-                  return SizedBox.shrink();
+                  return const Text('');
                 },
               ),
             ),

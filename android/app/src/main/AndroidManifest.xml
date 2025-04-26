@@ -3,6 +3,7 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
@@ -20,6 +21,7 @@
         android:label="flutter_application_6"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
+        android:foregroundServiceType="connectedDevice|dataSync"
         android:enableOnBackInvokedCallback="true">
         <receiver android:name="dev.fluttercommunity.plus.androidalarmmanager.AlarmBroadcastReceiver" />
         <activity

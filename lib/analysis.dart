@@ -7,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'navbar.dart';
 import 'home_screen.dart';
 import 'stepsgraph.dart';
+import 'dart:convert';
+import 'dart:async';
 
 class AnalysisPage extends StatefulWidget {
   final Map<String, int> dailyIntakes;
@@ -25,12 +27,54 @@ class AnalysisPageState extends State<AnalysisPage> {
   List<int> hourlySteps = List.generate(24, (index) => 0);
   List<int> dailySteps = List.generate(7, (index) => 0);
   List<int> monthlySteps = List.generate(4, (index) => 0);
+  int selectedDayIntake = 0;
 
   @override
   void initState() {
     super.initState();
     _loadTotalGoalsIncreased();
     _loadStepsData();
+    _loadSelectedDayIntake();
+  }
+
+  // Load the water intake for the selected date
+  Future<void> _loadSelectedDayIntake() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String dateKey = DateFormat('yyyy-MM-dd').format(selectedDate);
+
+    // Try to get from the provided dailyIntakes map first
+    int intake = widget.dailyIntakes[dateKey] ?? 0;
+
+    // If not found, try to get from SharedPreferences as fallback
+    if (intake == 0) {
+      // Try to load from hourlyIntakes to get the day's total
+      String? jsonString = prefs.getString('hourlyIntakes');
+      if (jsonString != null) {
+        try {
+          Map<String, dynamic> decoded = json.decode(jsonString);
+          if (decoded.containsKey(dateKey)) {
+            Map<String, dynamic> dayData = decoded[dateKey];
+            int dayTotal = 0;
+            dayData.forEach((hour, value) {
+              dayTotal += (value as int);
+            });
+            intake = dayTotal;
+          }
+        } catch (e) {
+          // Handle JSON parsing error
+          print("Error parsing hourlyIntakes: $e");
+        }
+      }
+
+      // If still not found, check for a direct daily record
+      if (intake == 0) {
+        intake = prefs.getInt('water_intake_$dateKey') ?? 0;
+      }
+    }
+
+    setState(() {
+      selectedDayIntake = intake;
+    });
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -44,32 +88,80 @@ class AnalysisPageState extends State<AnalysisPage> {
       setState(() {
         selectedDate = picked;
       });
+      _loadStepsDataForDate(picked);
+      _loadSelectedDayIntake();
     }
+  }
+
+  // Navigate to previous day
+  void _previousDay() {
+    DateTime newDate = selectedDate.subtract(Duration(days: 1));
+    setState(() {
+      selectedDate = newDate;
+    });
+    _loadStepsDataForDate(newDate);
+    _loadSelectedDayIntake();
+  }
+
+  // Navigate to next day
+  void _nextDay() {
+    DateTime newDate = selectedDate.add(Duration(days: 1));
+    // Don't allow selecting future dates
+    if (newDate.isBefore(DateTime.now().add(Duration(days: 1)))) {
+      setState(() {
+        selectedDate = newDate;
+      });
+      _loadStepsDataForDate(newDate);
+      _loadSelectedDayIntake();
+    }
+  }
+
+  // Load steps data for a specific date
+  Future<void> _loadStepsDataForDate(DateTime date) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Load hourly steps for the selected date
+    List<int> hourly = List.generate(24, (index) {
+      String key = "steps_${date.year}_${date.month}_${date.day}_$index";
+      return prefs.getInt(key) ?? 0;
+    });
+
+    setState(() {
+      hourlySteps = hourly;
+    });
   }
 
   Future<void> _loadStepsData() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
+
+    // Load hourly steps for the current selected date
+    _loadStepsDataForDate(selectedDate);
+
+    // Load weekly data
     DateTime now = DateTime.now();
-
-    List<int> hourly = List.generate(24, (index) {
-      String key = "steps_${now.year}_${now.month}_${now.day}_$index";
-      return prefs.getInt(key) ?? 0;
-    });
-
     List<int> weekly = [];
     for (int i = 0; i < 7; i++) {
       DateTime date = now.subtract(Duration(days: i));
       String key = "steps_${date.year}_${date.month}_${date.day}";
-      weekly.add(prefs.getInt(key) ?? 0);
+      int dailyTotal = 0;
+
+      // Calculate daily total by summing hourly values
+      for (int hour = 0; hour < 24; hour++) {
+        String hourlyKey = "steps_${date.year}_${date.month}_${date.day}_$hour";
+        dailyTotal += prefs.getInt(hourlyKey) ?? 0;
+      }
+
+      // Use the calculated total or fall back to the daily stored value
+      weekly.add(dailyTotal > 0 ? dailyTotal : (prefs.getInt(key) ?? 0));
     }
 
+    // Load monthly data
     List<int> monthly = List.generate(4, (week) {
       String key = "steps_${now.year}_${now.month}_week${week + 1}";
       return prefs.getInt(key) ?? 0;
     });
 
     setState(() {
-      hourlySteps = hourly;
       dailySteps = weekly.reversed.toList();
       monthlySteps = monthly;
     });
@@ -229,35 +321,33 @@ class AnalysisPageState extends State<AnalysisPage> {
   }
 
   Widget _buildDailyView(int totalGoalsMet, int totalIncompleteGoals) {
-    final todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final todayIntake = widget.dailyIntakes[todayDate] ?? 0;
+    // Calculate average hourly intake for the selected date
+    final averageHourlyIntake = (selectedDayIntake / 24).toStringAsFixed(1);
 
-    final averageHourlyIntake = (todayIntake / 24).toStringAsFixed(1);
-    //final averageHourlySteps = (widget.hourlySteps.reduce((a, b) => a + b) / 24).toStringAsFixed(1);
-    // Calculate average
+    // Calculate average hourly steps
+    final int totalDailySteps =
+        hourlySteps.fold(0, (sum, steps) => sum + steps);
+    final String averageHourlySteps =
+        totalDailySteps > 0 ? (totalDailySteps / 24).toStringAsFixed(1) : "0";
 
     return SingleChildScrollView(
       child: Column(
         children: [
-          //SizedBox(height: 10),
           Padding(
             padding: const EdgeInsets.all(5.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                GestureDetector(
-                  onTap: () => _selectDate(context),
-                  child: Row(
-                    children: [
-                      // Text(
-                      //   "Today ",
-                      //   style: TextStyle(
-                      //     fontSize: 20,
-                      //     fontWeight: FontWeight.w500,
-                      //     color: Colors.cyan.shade500,
-                      //   ),
-                      // ),
-                      Text(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_left, color: Colors.white),
+                      onPressed: _previousDay,
+                    ),
+                    GestureDetector(
+                      onTap: () => _selectDate(context),
+                      child: Text(
                         DateFormat('EEEE dd').format(selectedDate),
                         style: TextStyle(
                           fontSize: 20,
@@ -265,14 +355,12 @@ class AnalysisPageState extends State<AnalysisPage> {
                           color: Colors.cyan.shade500,
                         ),
                       ),
-                      // SizedBox(width: 8),
-                      // Icon(
-                      //   Icons.touch_app,
-                      //   size: 20,
-                      //   color: Colors.cyan.shade500,
-                      // ),
-                    ],
-                  ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.arrow_right, color: Colors.white),
+                      onPressed: _nextDay,
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -280,22 +368,14 @@ class AnalysisPageState extends State<AnalysisPage> {
           SizedBox(height: 10),
           _buildGraphContainer(
             title: 'HOURLY AVERAGE WATER INTAKE',
-            value: '$averageHourlyIntake ml', // Show average
+            value: '$averageHourlyIntake ml/hr',
             valueColor: Colors.blue,
-            chart: const HourlyWaterIntakeChart(), // Hourly chart widget
+            chart: HourlyWaterIntakeChart(selectedDate: selectedDate),
           ),
-          // SizedBox(height: 10),
-          // _buildGraphContainer(
-          //   title: 'HOURLY Steps',
-          //   value: '', // Show average
-          //   valueColor: Colors.pink,
-          //   chart: const HourlyStepsChart(), // Hourly chart widget
-          // ),
           SizedBox(height: 10),
           _buildGraphContainer(
             title: 'HOURLY STEPS',
-            value:
-                '${(hourlySteps.reduce((a, b) => a + b) / hourlySteps.length).round()} steps/hr',
+            value: '$averageHourlySteps steps/hr',
             valueColor: Colors.pink,
             chart: StepsActivityChart(
               stepsData: hourlySteps,
@@ -322,10 +402,17 @@ class AnalysisPageState extends State<AnalysisPage> {
   }
 
   Widget _buildMonthlyView(int totalGoalsMet, int totalIncompleteGoals) {
-    // Similar structure to daily view but with weekly data
-    final averageIntake = widget.dailyIntakes.values.isEmpty
+    // Calculate monthly average water intake
+    final monthlyAverageIntake = widget.dailyIntakes.values.isEmpty
         ? 0
-        : widget.dailyIntakes.values.reduce((a, b) => a + b) / 7;
+        : widget.dailyIntakes.values.reduce((a, b) => a + b) /
+            widget.dailyIntakes.length;
+
+    // Calculate monthly average steps
+    final int totalMonthlySteps =
+        monthlySteps.fold(0, (sum, steps) => sum + steps);
+    final double averageWeeklySteps =
+        monthlySteps.isNotEmpty ? totalMonthlySteps / monthlySteps.length : 0;
 
     return SingleChildScrollView(
       child: Column(
@@ -347,12 +434,6 @@ class AnalysisPageState extends State<AnalysisPage> {
                           color: Colors.cyan.shade500,
                         ),
                       ),
-                      //SizedBox(width: 8),
-                      // Icon(
-                      //   Icons.touch_app,
-                      //   size: 20,
-                      //   color: Colors.cyan.shade500,
-                      // ),
                     ],
                   ),
                 ),
@@ -362,8 +443,7 @@ class AnalysisPageState extends State<AnalysisPage> {
           SizedBox(height: 10),
           _buildGraphContainer(
             title: 'MONTHLY AVERAGE WATER INTAKE',
-            value:
-                '${(widget.dailyIntakes.values.isNotEmpty ? widget.dailyIntakes.values.reduce((a, b) => a + b) / 4 : 0).round()} ml',
+            value: '${monthlyAverageIntake.round()} ml',
             valueColor: Colors.blue,
             chart: MonthlyWaterIntakeChart(
               weeklyAverages: List.generate(4, (index) {
@@ -376,17 +456,14 @@ class AnalysisPageState extends State<AnalysisPage> {
                     count++;
                   }
                 }
-                return count > 0
-                    ? (sum / count).toDouble()
-                    : 0.0; // Cast to double
+                return count > 0 ? (sum / count).toDouble() : 0.0;
               }).reversed.toList(),
             ),
           ),
           SizedBox(height: 10),
           _buildGraphContainer(
             title: 'MONTHLY STEPS',
-            value:
-                '${(monthlySteps.reduce((a, b) => a + b) / monthlySteps.length).round()} steps/week',
+            value: '${averageWeeklySteps.round()} steps/week',
             valueColor: Colors.pink,
             chart: StepsActivityChart(
               stepsData: monthlySteps,
