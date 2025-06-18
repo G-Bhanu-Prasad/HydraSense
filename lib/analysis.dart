@@ -372,16 +372,16 @@ class AnalysisPageState extends State<AnalysisPage> {
             valueColor: Colors.blue,
             chart: HourlyWaterIntakeChart(selectedDate: selectedDate),
           ),
-          SizedBox(height: 10),
-          _buildGraphContainer(
-            title: 'HOURLY STEPS',
-            value: '$averageHourlySteps steps/hr',
-            valueColor: Colors.pink,
-            chart: StepsActivityChart(
-              stepsData: hourlySteps,
-              timeFrame: "daily",
-            ),
-          ),
+          // SizedBox(height: 10),
+          // _buildGraphContainer(
+          //   title: 'HOURLY STEPS',
+          //   value: '$averageHourlySteps steps/hr',
+          //   valueColor: Colors.pink,
+          //   chart: StepsActivityChart(
+          //     stepsData: hourlySteps,
+          //     timeFrame: "daily",
+          //   ),
+          // ),
           SizedBox(height: 10),
           Container(
             height: 170,
@@ -460,16 +460,16 @@ class AnalysisPageState extends State<AnalysisPage> {
               }).reversed.toList(),
             ),
           ),
-          SizedBox(height: 10),
-          _buildGraphContainer(
-            title: 'MONTHLY STEPS',
-            value: '${averageWeeklySteps.round()} steps/week',
-            valueColor: Colors.pink,
-            chart: StepsActivityChart(
-              stepsData: monthlySteps,
-              timeFrame: "monthly",
-            ),
-          ),
+          // SizedBox(height: 10),
+          // _buildGraphContainer(
+          //   title: 'MONTHLY STEPS',
+          //   value: '${averageWeeklySteps.round()} steps/week',
+          //   valueColor: Colors.pink,
+          //   chart: StepsActivityChart(
+          //     stepsData: monthlySteps,
+          //     timeFrame: "monthly",
+          //   ),
+          // ),
           SizedBox(height: 10),
           Container(
             height: 170,

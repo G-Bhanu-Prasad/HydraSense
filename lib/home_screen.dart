@@ -11,6 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter/services.dart';
 import 'navbar.dart';
 import 'dart:async';
+import 'package:provider/provider.dart';
+import 'package:flutter_application_2/distanceprovider.dart';
 
 class ProfileDisplayScreen extends StatefulWidget {
   const ProfileDisplayScreen({super.key});
@@ -94,6 +96,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
   int totalGoalsIncreased = 0;
   int steps = 0;
   DateTime? lastWaterIntake;
+  int? _lastAddedDistance;
+
 //changed
   @override
   void initState() {
@@ -567,6 +571,19 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     }
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final provider = Provider.of<DistanceProvider>(context);
+    final distance = provider.distance;
+
+    if (distance != null && distance > 0 && distance != _lastAddedDistance) {
+      _lastAddedDistance = distance; // Mark as added so it doesn’t repeat
+      addWater(distance); // Your existing method
+    }
+  }
+
   void addWater(int amount) async {
     DateTime today = DateTime.now();
     String todayDate = DateFormat('yyyy-MM-dd').format(today);
@@ -861,6 +878,43 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               child: Column(
                 children: [
+                  Consumer<ConnectionProvider>(
+                    builder: (context, connectionProvider, child) {
+                      return Container(
+                        width: double.infinity,
+                        color: connectionProvider.isConnected
+                            ? Colors.green[100]
+                            : Colors.red[100],
+                        padding: const EdgeInsets.all(8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              connectionProvider.isConnected
+                                  ? Icons.check_circle
+                                  : Icons.error,
+                              color: connectionProvider.isConnected
+                                  ? Colors.green
+                                  : Colors.red,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              connectionProvider.isConnected
+                                  ? "Bottle Connected"
+                                  : "Bottle Not Connected",
+                              style: TextStyle(
+                                color: connectionProvider.isConnected
+                                    ? Colors.green[800]
+                                    : Colors.red[800],
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
                   SizedBox(height: screenHeight * 0.02),
                   Container(
                     width: double.infinity,
@@ -1111,6 +1165,22 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                       ),
                     ),
                   ),
+                  // Consumer<DistanceProvider>(
+                  //   builder: (context, provider, child) {
+                  //     if (provider.distance == null) {
+                  //       return const CircularProgressIndicator(); // or a default message
+                  //     } else {
+                  //       return Text(
+                  //         "${provider.distance} ml",
+                  //         style: const TextStyle(
+                  //           fontSize: 24,
+                  //           fontWeight: FontWeight.bold,
+                  //           color: Colors.green,
+                  //         ),
+                  //       );
+                  //     }
+                  //   },
+                  // ),
                   //SizedBox(height: screenHeight * 0.001),
 
                   // Stats Row

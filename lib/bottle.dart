@@ -5,8 +5,11 @@ import 'dart:math' as math;
 import 'navbar.dart';
 import 'home_screen.dart';
 import 'dart:convert';
-import 'dart:typed_data';
-import 'distancescreen.dart';
+// import 'dart:typed_data';
+// import 'distancescreen.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_application_2/distanceprovider.dart';
+// import 'package:flutter_application_2/home_screen.dart';
 
 class BottlePage extends StatefulWidget {
   const BottlePage({super.key});
@@ -280,6 +283,11 @@ class BottlePageState extends State<BottlePage>
         isScanning = false;
       });
     }
+  }
+
+  Future<void> saveDeviceId(String id) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('lastConnectedDeviceId', id);
   }
 
   Widget _buildDeviceIndicator(double angle, ScanResult result) {
@@ -611,7 +619,6 @@ class BottlePageState extends State<BottlePage>
     try {
       await device.connect(timeout: const Duration(seconds: 10));
 
-      // ✅ Discover and get services
       final services = await device.discoverServices();
 
       final targetService = services.firstWhere(
@@ -628,22 +635,52 @@ class BottlePageState extends State<BottlePage>
         orElse: () => throw Exception("Target characteristic not found"),
       );
 
-      await targetCharacteristic.setNotifyValue(true);
+      // ✅ Save device ID in SharedPreferences
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('lastConnectedDeviceId', device.remoteId.str);
+
+      // ✅ Notify connection successful
+      final connectionProvider =
+          Provider.of<ConnectionProvider>(context, listen: false);
+      connectionProvider.setConnectionStatus(true);
+
+      // ✅ Start listening to distance characteristic
+      final distanceProvider =
+          Provider.of<DistanceProvider>(context, listen: false);
+      distanceProvider.startListening(targetCharacteristic);
+
+      // ✅ Monitor disconnection
+      device.connectionState.listen((state) {
+        if (state == BluetoothConnectionState.disconnected) {
+          connectionProvider.setConnectionStatus(false);
+        } else if (state == BluetoothConnectionState.connected) {
+          connectionProvider.setConnectionStatus(true);
+        }
+      });
 
       Navigator.pop(context); // dismiss dialog
-      Navigator.push(
+
+      // ✅ Go to main screen
+      Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (_) => DistanceScreen(
-            device: device,
-            characteristic: targetCharacteristic,
-          ),
+          builder: (_) => const ProfileDisplayScreen(),
         ),
       );
     } catch (e) {
-      Navigator.pop(context); // dismiss dialog
+      Navigator.pop(context);
+
+      final connectionProvider =
+          Provider.of<ConnectionProvider>(context, listen: false);
+      connectionProvider.setConnectionStatus(false);
+
       _showSnackBar('Failed to connect: $e', isError: true);
     }
+  }
+
+  Future<String?> getSavedDeviceId() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    return prefs.getString('lastConnectedDeviceId');
   }
 
   @override

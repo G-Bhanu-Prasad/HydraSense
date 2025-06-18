@@ -9,6 +9,8 @@ import 'package:flutter_application_2/profilescreens.dart/name.dart';
 import 'package:flutter_application_2/home_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 //import 'package:flutter_application_2/profilescreens.dart/logo.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_application_2/distanceprovider.dart'; // Create this file as described below
 
 Future<void> requestExactAlarmPermission() async {
   if (await Permission.scheduleExactAlarm.isDenied) {
@@ -30,7 +32,15 @@ void main() async {
   SharedPreferences prefs = await SharedPreferences.getInstance();
   bool isFirstTimeUser = prefs.getBool('isFirstTimeUser') ?? true;
 
-  runApp(HydraSense(isFirstTimeUser: isFirstTimeUser));
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => DistanceProvider()),
+        ChangeNotifierProvider(create: (_) => ConnectionProvider()), // add this
+      ],
+      child: HydraSense(isFirstTimeUser: isFirstTimeUser),
+    ),
+  );
 }
 
 class HydraSense extends StatelessWidget {
