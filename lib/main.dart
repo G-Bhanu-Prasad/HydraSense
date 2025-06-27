@@ -13,7 +13,13 @@ import 'package:provider/provider.dart';
 import 'package:flutter_application_2/distanceprovider.dart'; // Create this file as described below
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:flutter_application_2/ble_helper.dart';
+import 'package:flutter_application_2/foreground_task_handler.dart';
+import 'dart:io';
+
+@pragma('vm:entry-point')
+void startCallback() {
+  FlutterForegroundTask.setTaskHandler(MyTaskHandler());
+}
 
 Future<void> requestExactAlarmPermission() async {
   if (await Permission.scheduleExactAlarm.isDenied) {
@@ -21,8 +27,30 @@ Future<void> requestExactAlarmPermission() async {
   }
 }
 
+Future<void> requestBluetoothPermissions() async {
+  if (Platform.isAndroid) {
+    if (!await Permission.bluetoothScan.isGranted) {
+      await Permission.bluetoothScan.request();
+    }
+
+    if (!await Permission.bluetoothConnect.isGranted) {
+      await Permission.bluetoothConnect.request();
+    }
+
+    if (!await Permission.ignoreBatteryOptimizations.isGranted) {
+      await Permission.ignoreBatteryOptimizations.request();
+    }
+
+    // Optional: for Android 13+ notification display
+    if (!await Permission.notification.isGranted) {
+      await Permission.notification.request();
+    }
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  FlutterForegroundTask.initCommunicationPort();
   tz.initializeTimeZones();
   await NotificationService().initialize();
 
@@ -34,6 +62,28 @@ void main() async {
   // Check if the user is a first-time user before launching the app
   SharedPreferences prefs = await SharedPreferences.getInstance();
   bool isFirstTimeUser = prefs.getBool('isFirstTimeUser') ?? true;
+
+  FlutterForegroundTask.init(
+    androidNotificationOptions: AndroidNotificationOptions(
+      channelId: 'hydrasense_channel',
+      channelName: 'HydraSense Background BLE',
+      channelDescription: 'Keeps BLE connected in background',
+    ),
+    iosNotificationOptions: IOSNotificationOptions(),
+    foregroundTaskOptions: ForegroundTaskOptions(
+      eventAction: ForegroundTaskEventAction.repeat(5000), // 👈 required!
+      allowWakeLock: true,
+      autoRunOnBoot: true,
+    ),
+  );
+
+  FlutterForegroundTask.startService(
+    notificationTitle: 'HydraSense Active',
+    notificationText: 'Monitoring your smart bottle...',
+    callback: startCallback,
+  );
+
+  await requestBluetoothPermissions();
 
   runApp(
     MultiProvider(

@@ -98,6 +98,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
   int steps = 0;
   DateTime? lastWaterIntake;
   int? _lastAddedDistance;
+  late DistanceProvider _distanceProvider;
 
 //changed
   @override
@@ -108,6 +109,12 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
         isLoading = false;
       });
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _distanceProvider = Provider.of<DistanceProvider>(context, listen: false);
+      _distanceProvider.addListener(_handleDistanceChange);
+    });
+
     loadDailyData();
     loadHourlySteps();
     loadHourlyIntakes();
@@ -138,6 +145,20 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
         });
       });
     });
+  }
+
+  void _handleDistanceChange() {
+    final distance = _distanceProvider.distance;
+    if (distance != null && distance > 0 && distance != _lastAddedDistance) {
+      _lastAddedDistance = distance;
+      addWater(distance);
+    }
+  }
+
+  @override
+  void dispose() {
+    _distanceProvider.removeListener(_handleDistanceChange);
+    super.dispose();
   }
 
   Future<void> _reloadHomeScreen() async {
@@ -809,6 +830,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     final horizontalPadding = screenWidth * 0.05;
     final verticalPadding = screenHeight * 0.02;
     double progress = dailyIntake / dailyGoal;
+    final distance = context.watch<DistanceProvider>().distance;
 
     return PopScope(
       canPop: false,
@@ -1167,6 +1189,10 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                         ],
                       ),
                     ),
+                  ),
+                  Text(
+                    distance != null ? 'Distance: $distance cm' : 'Waiting...',
+                    style: TextStyle(fontSize: 20),
                   ),
                   // Consumer<DistanceProvider>(
                   //   builder: (context, provider, child) {
