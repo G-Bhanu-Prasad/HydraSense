@@ -12,6 +12,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_2/distanceprovider.dart'; // Create this file as described below
 
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
+import 'package:flutter_application_2/ble_helper.dart';
+
 Future<void> requestExactAlarmPermission() async {
   if (await Permission.scheduleExactAlarm.isDenied) {
     await Permission.scheduleExactAlarm.request();

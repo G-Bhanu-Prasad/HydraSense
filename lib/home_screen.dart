@@ -13,6 +13,7 @@ import 'navbar.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_2/distanceprovider.dart';
+import 'package:flutter_application_2/ble_helper.dart';
 
 class ProfileDisplayScreen extends StatefulWidget {
   const ProfileDisplayScreen({super.key});
@@ -114,6 +115,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     getCurrentLocation();
     _requestLocationPermission();
     _requestPhysicalActivityPermission();
+    BLEHelper.autoReconnectToLastDevice(context);
 
     //changed
     _loadLastWaterIntake();
@@ -146,6 +148,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     try {
       await loadDailyData();
       await _loadDailyGoal();
+      BLEHelper.autoReconnectToLastDevice(context);
 
       final position = await Geolocator.getCurrentPosition();
       await fetchWeather(position.latitude, position.longitude);

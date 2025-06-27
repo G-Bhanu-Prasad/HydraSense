@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_2/distanceprovider.dart';
 // import 'package:flutter_application_2/home_screen.dart';
+//import 'package:flutter_application_2/ble_helper.dart';
 
 class BottlePage extends StatefulWidget {
   const BottlePage({super.key});
@@ -44,6 +45,27 @@ class BottlePageState extends State<BottlePage>
     _startScanning();
     _checkBluetoothStatus();
     _loadDailyIntakes();
+    _autoReconnectToLastDevice();
+  }
+
+  Future<void> _autoReconnectToLastDevice() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? lastId = prefs.getString('lastConnectedDeviceId');
+
+    if (lastId != null) {
+      // Start scanning to find the previously connected device
+      FlutterBluePlus.startScan(timeout: const Duration(seconds: 5));
+
+      FlutterBluePlus.scanResults.listen((results) {
+        for (ScanResult result in results) {
+          if (result.device.remoteId.str == lastId) {
+            FlutterBluePlus.stopScan();
+            _pairAndConnectDevice(result.device); // ✅ your existing method
+            break;
+          }
+        }
+      });
+    }
   }
 
   Future<void> _loadDailyIntakes() async {
@@ -617,8 +639,14 @@ class BottlePageState extends State<BottlePage>
     );
 
     try {
+      // Attempt to connect with timeout
       await device.connect(timeout: const Duration(seconds: 10));
 
+      // Save device ID for auto-reconnect
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('lastConnectedDeviceId', device.remoteId.str);
+
+      // Discover services
       final services = await device.discoverServices();
 
       final targetService = services.firstWhere(
@@ -634,10 +662,6 @@ class BottlePageState extends State<BottlePage>
             "19b10001-e8f2-537e-4f6c-d104768a1214",
         orElse: () => throw Exception("Target characteristic not found"),
       );
-
-      // ✅ Save device ID in SharedPreferences
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('lastConnectedDeviceId', device.remoteId.str);
 
       // ✅ Notify connection successful
       final connectionProvider =
@@ -660,7 +684,7 @@ class BottlePageState extends State<BottlePage>
 
       Navigator.pop(context); // dismiss dialog
 
-      // ✅ Go to main screen
+      // ✅ Go to display screen
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -668,7 +692,7 @@ class BottlePageState extends State<BottlePage>
         ),
       );
     } catch (e) {
-      Navigator.pop(context);
+      Navigator.pop(context); // close dialog on error
 
       final connectionProvider =
           Provider.of<ConnectionProvider>(context, listen: false);
