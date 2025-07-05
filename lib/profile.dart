@@ -6,7 +6,7 @@ import 'package:flutter_application_2/profileedit.dart';
 import 'navbar.dart';
 import 'home_screen.dart';
 import 'dart:convert';
-import 'package:google_fonts/google_fonts.dart';
+// import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_2/profilescreens.dart/changepass.dart';
 
 class ProfilePage extends StatefulWidget {

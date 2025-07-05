@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "582612689331",
+    "project_id": "hydrasense-d711b",
+    "storage_bucket": "hydrasense-d711b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:582612689331:android:99ae8a9621260ae45aabc6",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCLYPXcOJKJnz7EO6ONg8Lofwztdqj3SfU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
