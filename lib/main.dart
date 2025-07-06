@@ -16,6 +16,9 @@ import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_application_2/foreground_task_handler.dart';
 import 'dart:io';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+
 @pragma('vm:entry-point')
 void startCallback() {
   FlutterForegroundTask.setTaskHandler(MyTaskHandler());
@@ -50,6 +53,8 @@ Future<void> requestBluetoothPermissions() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
   FlutterForegroundTask.initCommunicationPort();
   tz.initializeTimeZones();
   await NotificationService().initialize();

@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_application_2/home_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_application_2/models/user_profile.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class HeightSelectorScreen extends StatefulWidget {
-  const HeightSelectorScreen({super.key});
+  final UserData userData;
+
+  const HeightSelectorScreen({super.key, required this.userData});
 
   @override
   HeightSelectorScreenState createState() => HeightSelectorScreenState();
@@ -199,20 +204,53 @@ class HeightSelectorScreenState extends State<HeightSelectorScreen> {
                     ),
                     ElevatedButton(
                       onPressed: () async {
-                        SharedPreferences prefs =
-                            await SharedPreferences.getInstance();
-                        // Saving height in both formats
-                        await prefs.setDouble('heightInCm', heightInCm);
-                        await prefs.setString('heightInFtInches',
-                            _convertToFeetAndInches(heightInCm));
-                        // Save height
-                        await prefs.setBool('isFirstTimeUser', false);
-                        if (context.mounted) {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                                builder: (context) =>
-                                    const ProfileDisplayScreen()),
+                        try {
+                          widget.userData.height = heightInCm;
+
+                          // Create user in Firebase Auth
+                          UserCredential userCredential = await FirebaseAuth
+                              .instance
+                              .createUserWithEmailAndPassword(
+                            email: widget.userData.email,
+                            password: widget.userData.password,
+                          );
+
+                          // Save user data in Firestore
+                          await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(userCredential.user!.uid)
+                              .set(widget.userData.toMap());
+
+                          SharedPreferences prefs =
+                              await SharedPreferences.getInstance();
+                          await prefs.setBool('isFirstTimeUser', false);
+
+                          if (context.mounted) {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (context) =>
+                                      const ProfileDisplayScreen()),
+                            );
+                          }
+                        } on FirebaseAuthException catch (e) {
+                          String errorMessage = 'An error occurred';
+                          if (e.code == 'email-already-in-use') {
+                            errorMessage = 'This email is already in use.';
+                          } else if (e.code == 'invalid-email') {
+                            errorMessage = 'The email address is invalid.';
+                          } else if (e.code == 'weak-password') {
+                            errorMessage = 'The password is too weak.';
+                          }
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(errorMessage)),
+                          );
+                        } catch (e) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content:
+                                    Text('Unexpected error: ${e.toString()}')),
                           );
                         }
                       },

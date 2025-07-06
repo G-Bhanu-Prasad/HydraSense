@@ -8,6 +8,10 @@ import 'home_screen.dart';
 import 'dart:convert';
 // import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_2/profilescreens.dart/changepass.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'main.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -118,22 +122,37 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> loadProfileDetails() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
 
+    // Try to load from SharedPreferences first (offline support)
+    String savedName = prefs.getString('userName') ?? 'Unknown';
+
     setState(() {
-      // Load saved data from SharedPreferences and use defaults if not found
-      userName = prefs.getString('userName') ?? 'Unknown';
-      _selectedAge = prefs.getInt('age') ?? 18;
-      heightInCm = prefs.getDouble('heightInCm') ?? 0;
-      _selectedWeight = prefs.getDouble('weight') ?? 50.0;
-      _selectedActivity = prefs.getString('activity') ?? '80';
-
-      // Fetch gender from SharedPreferences
-      String gender = prefs.getString('gender') ?? 'Male'; // Default to Male
-
-      // Set profile image based on gender
-      selectedImage = gender == 'Female'
-          ? 'lib/images/profile2.jpg'
-          : 'lib/images/profile1.jpg';
+      userName = savedName;
     });
+
+    // Then try fetching from Firestore (online)
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+
+        if (doc.exists) {
+          final data = doc.data();
+          final fetchedName = data?['userName'] ?? 'Unknown';
+
+          setState(() {
+            userName = fetchedName;
+          });
+
+          // Save it for offline use next time
+          await prefs.setString('userName', fetchedName);
+        }
+      }
+    } catch (e) {
+      print("Error fetching userName from Firestore: $e");
+    }
   }
 
   @override
@@ -184,63 +203,75 @@ class _ProfilePageState extends State<ProfilePage> {
                 // Profile Section
                 Row(
                   children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            const Color.fromARGB(255, 10, 33, 210)
-                                .withOpacity(0.3),
-                            Colors.cyan.withOpacity(0.8),
+                    // Container(
+                    //   width: 60,
+                    //   height: 60,
+                    //   decoration: BoxDecoration(
+                    //     gradient: LinearGradient(
+                    //       begin: Alignment.topLeft,
+                    //       end: Alignment.bottomRight,
+                    //       colors: [
+                    //         const Color.fromARGB(255, 10, 33, 210)
+                    //             .withOpacity(0.3),
+                    //         Colors.cyan.withOpacity(0.8),
+                    //       ],
+                    //     ),
+                    //     shape: BoxShape.circle,
+                    //   ),
+                    //   child: ClipRRect(
+                    //     borderRadius: BorderRadius.circular(30),
+                    //     child: Image.asset(
+                    //       selectedImage,
+                    //       fit: BoxFit.cover,
+                    //     ),
+                    //   ),
+                    // ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 5),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 4),
+                            Text(
+                              'Hello',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              userName,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
                           ],
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(30),
-                        child: Image.asset(
-                          selectedImage,
-                          fit: BoxFit.cover,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 4),
-                          Text(
-                            'Hello!',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            userName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'Edit Profile',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white,
                       ),
                     ),
                     IconButton(
                       icon:
                           const Icon(Icons.edit_outlined, color: Colors.white),
                       onPressed: () {
+                        // Navigate to the profile screen
+// In your ProfilePage, replace the navigation with:
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const ProfileEditScreen(),
+                            builder: (context) => ProfileEditScreen(),
                           ),
-                        ).then((_) => loadProfileDetails());
+                        );
                       },
                     ),
                   ],
@@ -473,7 +504,62 @@ class _ProfilePageState extends State<ProfilePage> {
                   title: 'Logout',
                   textColor: Colors.red,
                   iconColor: Colors.red,
-                  onTap: () {},
+                  onTap: () async {
+                    // Show confirmation dialog
+                    bool confirm = await showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        backgroundColor: Colors.grey[900],
+                        title: const Text('Confirm Logout',
+                            style: TextStyle(color: Colors.white)),
+                        content: const Text('Are you sure you want to logout?',
+                            style: TextStyle(color: Colors.white70)),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('Cancel',
+                                style: TextStyle(color: Colors.blue)),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('Logout',
+                                style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (confirm) {
+                      try {
+                        // 1. Sign out from Firebase
+                        await FirebaseAuth.instance.signOut();
+
+                        // 2. Clear shared preferences
+                        SharedPreferences prefs =
+                            await SharedPreferences.getInstance();
+                        await prefs.clear();
+
+                        // 3. Navigate to login screen and remove all routes
+                        if (context.mounted) {
+                          Navigator.pushAndRemoveUntil(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const ProfileScreen()),
+                            (route) => false,
+                          );
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text("Logout failed: ${e.toString()}"),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    }
+                  },
                 ),
               ],
             ),

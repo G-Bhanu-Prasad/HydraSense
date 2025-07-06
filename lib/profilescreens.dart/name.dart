@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'gender.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_application_2/models/user_profile.dart';
 
 class NameInputScreen extends StatefulWidget {
   const NameInputScreen({super.key});
@@ -23,23 +24,26 @@ class _NameInputScreenState extends State<NameInputScreen> {
   }
 
   Future<void> _saveNameAndNavigate(BuildContext context) async {
-    if (_nameController.text.isNotEmpty && _emailController.text.isNotEmpty) {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('userName', _nameController.text);
-      await prefs.setString('email', _emailController.text);
-      await prefs.setString('password', _passwordController.text);
-      await prefs.setInt('age', _selectedAge);
+    if (_nameController.text.isNotEmpty &&
+        _emailController.text.isNotEmpty &&
+        _passwordController.text.isNotEmpty) {
+      UserData userData = UserData(
+        userName: _nameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+        age: _selectedAge,
+      );
 
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => GenderSelectionScreen(),
+          builder: (context) => GenderSelectionScreen(userData: userData),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Please enter your name and email'),
+          content: const Text('Please enter all required details'),
           backgroundColor: Colors.blue[700],
         ),
       );

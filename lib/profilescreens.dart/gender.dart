@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_application_2/profilescreens.dart/weight.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_application_2/models/user_profile.dart';
 
 class GenderSelectionScreen extends StatefulWidget {
-  const GenderSelectionScreen({super.key});
+  final UserData userData;
+
+  const GenderSelectionScreen({super.key, required this.userData});
 
   @override
   GenderSelectionScreenState createState() => GenderSelectionScreenState();
@@ -19,13 +22,16 @@ class GenderSelectionScreenState extends State<GenderSelectionScreen> {
     });
   }
 
-  void _onNextPressed() async {
+  void _onNextPressed() {
     if (_selectedGender != null) {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('gender', _selectedGender!);
+      widget.userData.gender = _selectedGender!;
+
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => WeightSelectionScreen()),
+        MaterialPageRoute(
+          builder: (context) =>
+              WeightSelectionScreen(userData: widget.userData),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

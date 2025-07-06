@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_2/profilescreens.dart/forgotpass.dart';
 import 'package:flutter_application_2/profile.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -49,18 +50,43 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     );
   }
 
-  void changePassword() {
+  void changePassword() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Here you would typically implement the password change logic
-    setState(() {
-      message = "Password changed successfully!";
-    });
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      final cred = EmailAuthProvider.credential(
+        email: user!.email!,
+        password: _currentPasswordController.text,
+      );
 
-    showMessage(message, false);
+      // Reauthenticate the user
+      await user.reauthenticateWithCredential(cred);
 
-    // Optional: Navigate back after successful password change
-    // Navigator.pop(context);
+      // Update the password
+      await user.updatePassword(_newPasswordController.text);
+
+      showMessage("Password changed successfully!", false);
+
+      if (context.mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const ProfilePage()),
+        );
+      }
+    } on FirebaseAuthException catch (e) {
+      String errorMessage = 'An error occurred';
+      if (e.code == 'wrong-password') {
+        errorMessage = 'The current password is incorrect.';
+      } else if (e.code == 'weak-password') {
+        errorMessage = 'The new password is too weak.';
+      } else if (e.code == 'requires-recent-login') {
+        errorMessage = 'Please log in again and try changing password.';
+      }
+      showMessage(errorMessage, true);
+    } catch (e) {
+      showMessage('Unexpected error: ${e.toString()}', true);
+    }
   }
 
   @override

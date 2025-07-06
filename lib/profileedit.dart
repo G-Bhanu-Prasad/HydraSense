@@ -1,128 +1,179 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_application_2/profile.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
 
   @override
-  ProfileEditScreenState createState() => ProfileEditScreenState();
+  State<ProfileEditScreen> createState() => _ProfileEditScreenState();
 }
 
-class ProfileEditScreenState extends State<ProfileEditScreen> {
-  final TextEditingController firstNameController = TextEditingController();
-  final TextEditingController weightController = TextEditingController();
-  final TextEditingController heightController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
-  bool _isPasswordVisible = false;
-  String selectedGender = 'Male'; // Default
-  int selectedAge = 18; // Default
+class _ProfileEditScreenState extends State<ProfileEditScreen> {
+  Map<String, dynamic>? userData;
 
   @override
   void initState() {
     super.initState();
-    loadProfileDetails();
+    _askPasswordThenNavigate();
   }
 
-  Future<void> loadProfileDetails() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+  Future<void> _askPasswordThenNavigate() async {
+    final passwordController = TextEditingController();
 
-    setState(() {
-      firstNameController.text = prefs.getString('userName') ?? 'Unknown';
-      emailController.text = prefs.getString('email') ?? 'Unknown';
-      selectedAge = prefs.getInt('age') ?? 18;
-      heightController.text =
-          prefs.getDouble('heightInCm')?.toStringAsFixed(0) ?? '170';
-      weightController.text =
-          prefs.getDouble('weight')?.toStringAsFixed(1) ?? '50';
-      selectedGender = prefs.getString('gender') ?? 'Male';
+    await Future.delayed(Duration.zero); // wait until UI builds
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1A2737),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: Text('Enter Password',
+              style: GoogleFonts.poppins(color: Colors.white)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Please enter your password to edit your profile.',
+                  style: TextStyle(color: Colors.white70)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                style: const TextStyle(color: Colors.white),
+                decoration: InputDecoration(
+                  hintText: 'Password',
+                  hintStyle: const TextStyle(color: Colors.white38),
+                  filled: true,
+                  fillColor: Colors.black12,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ProfilePage()),
+                );
+              },
+              child: const Text('Cancel', style: TextStyle(color: Colors.red)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final user = FirebaseAuth.instance.currentUser;
+                final email = user?.email;
+                final password = passwordController.text.trim();
+
+                try {
+                  if (email != null) {
+                    final credential = EmailAuthProvider.credential(
+                        email: email, password: password);
+                    await user!.reauthenticateWithCredential(credential);
+
+                    // Fetch user data
+                    final doc = await FirebaseFirestore.instance
+                        .collection('users')
+                        .doc(user.uid)
+                        .get();
+
+                    if (doc.exists && context.mounted) {
+                      Navigator.pop(context); // close dialog
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              EditFormScreen(existingData: doc.data()!),
+                        ),
+                      );
+                    }
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text("Incorrect password. Try again."),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Optional loading screen during password prompt
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0E21),
+      body: const Center(
+        child: CircularProgressIndicator(color: Colors.blue),
+      ),
+    );
+  }
+}
+
+class EditFormScreen extends StatefulWidget {
+  final Map<String, dynamic> existingData;
+
+  const EditFormScreen({super.key, required this.existingData});
+
+  @override
+  State<EditFormScreen> createState() => _EditFormScreenState();
+}
+
+class _EditFormScreenState extends State<EditFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController nameController;
+  late TextEditingController ageController;
+  late TextEditingController weightController;
+  late TextEditingController heightController;
+
+  @override
+  void initState() {
+    super.initState();
+    nameController =
+        TextEditingController(text: widget.existingData['userName']);
+    ageController =
+        TextEditingController(text: widget.existingData['age'].toString());
+    weightController =
+        TextEditingController(text: widget.existingData['weight'].toString());
+    heightController =
+        TextEditingController(text: widget.existingData['height'].toString());
+  }
+
+  Future<void> _saveChanges() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      'userName': nameController.text.trim(),
+      'age': int.tryParse(ageController.text.trim()) ?? 0,
+      'weight': double.tryParse(weightController.text.trim()) ?? 0.0,
+      'height': double.tryParse(heightController.text.trim()) ?? 0.0,
     });
-  }
 
-  Future<void> saveProfileDetails() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString('userName', firstNameController.text);
-    await prefs.setInt('age', selectedAge);
-    await prefs.setDouble(
-        'heightInCm', double.tryParse(heightController.text) ?? 170);
-    await prefs.setDouble(
-        'weight', double.tryParse(weightController.text) ?? 50);
-    await prefs.setString('gender', selectedGender);
-
-    Navigator.pop(context, true); // Return to ProfilePage
-  }
-
-  Widget _buildLabel(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: GoogleFonts.inter(
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-          color: Colors.white70,
-          letterSpacing: 0.3,
+    if (context.mounted) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Profile updated successfully."),
+          backgroundColor: Colors.green,
         ),
-      ),
-    );
-  }
-
-  Widget _buildTextField(TextEditingController controller,
-      {String? suffixText}) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.cyan.shade900.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.cyan.shade900.withOpacity(0.1),
-        ),
-      ),
-      child: TextField(
-        controller: controller,
-        cursorColor: Colors.cyan.shade900,
-        keyboardType: TextInputType.text,
-        style: GoogleFonts.inter(color: Colors.white, fontSize: 15),
-        decoration: InputDecoration(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-          border: InputBorder.none,
-          suffixText: suffixText,
-          suffixStyle: GoogleFonts.inter(color: Colors.white.withOpacity(0.5)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDropdown<T>(
-      {required T value,
-      required List<T> items,
-      required void Function(T?) onChanged}) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: Colors.cyan.shade900.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.cyan.shade900.withOpacity(0.1),
-        ),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<T>(
-          value: value,
-          isExpanded: true,
-          dropdownColor: const Color(0xFF1A1F32),
-          style: GoogleFonts.inter(color: Colors.white, fontSize: 15),
-          icon: Icon(Icons.keyboard_arrow_down_rounded,
-              color: Colors.white.withOpacity(0.5)),
-          items: items
-              .map((T item) => DropdownMenuItem<T>(
-                  value: item, child: Text(item.toString())))
-              .toList(),
-          onChanged: onChanged,
-        ),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -130,214 +181,53 @@ class ProfileEditScreenState extends State<ProfileEditScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E21),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new,
-              color: Colors.white.withOpacity(0.7), size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Text('Edit Profile',
-            style: GoogleFonts.inter(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Colors.white)),
-        centerTitle: true,
+        title: const Text("Edit Profile"),
+        backgroundColor: Colors.blue[900],
       ),
-      body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: ListView(
             children: [
+              _buildField("Full Name", nameController),
+              _buildField("Age", ageController,
+                  inputType: TextInputType.number),
+              _buildField("Weight (kg)", weightController,
+                  inputType: TextInputType.number),
+              _buildField("Height (cm)", heightController,
+                  inputType: TextInputType.number),
               const SizedBox(height: 20),
-              Center(
-                child: Stack(
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.cyanAccent, // Border color
-                          width: 2, // Border thickness
-                        ),
-                      ),
-                      child: CircleAvatar(
-                        radius: 50,
-                        backgroundImage: AssetImage('lib/images/profile1.jpg'),
-                      ),
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [
-                              const Color.fromARGB(255, 10, 33, 210)
-                                  .withOpacity(0.3),
-                              Colors.cyan.withOpacity(0.8),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          border:
-                              Border.all(color: Colors.white.withOpacity(0.1)),
-                        ),
-                        child: Icon(Icons.edit,
-                            size: 16, color: Colors.white.withOpacity(0.9)),
-                      ),
-                    ),
-                  ],
+              ElevatedButton(
+                onPressed: _saveChanges,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue[800],
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
+                child:
+                    const Text("Save", style: TextStyle(color: Colors.white)),
               ),
-              const SizedBox(height: 20),
-              Text('PERSONAL INFORMATION',
-                  style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue)),
-              const SizedBox(height: 10),
-              _buildLabel('Full Name'),
-              _buildTextField(firstNameController),
-              const SizedBox(height: 10),
-              _buildLabel('Change Email'),
-              Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.cyan.shade900.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(12),
-                  border:
-                      Border.all(color: Colors.cyan.shade900.withOpacity(0.1)),
-                ),
-                child: TextField(
-                  controller: emailController,
-                  //obscureText: !_isPasswordVisible,
-                  style: GoogleFonts.inter(color: Colors.white, fontSize: 15),
-                  textAlign: TextAlign.left,
-                  cursorColor: Colors.cyan.shade900,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(
-                        vertical: 15,
-                        horizontal: 16), // Equal space above and below
-                    border: InputBorder.none,
-                    // suffixIcon: IconButton(
-                    //   icon: Icon(
-                    //     _isPasswordVisible
-                    //         ? Icons.visibility
-                    //         : Icons.visibility_off,
-                    //     color: Colors.white.withOpacity(0.5),
-                    //   ),
-                    //   onPressed: () {
-                    //     setState(() {
-                    //       _isPasswordVisible = !_isPasswordVisible;
-                    //     });
-                    //   },
-                    // ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text('PHYSICAL INFORMATION',
-                  style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue)),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Gender'),
-                        _buildDropdown(
-                          value: selectedGender,
-                          items: ['Male', 'Female', 'Other'],
-                          onChanged: (String? newValue) => setState(
-                              () => selectedGender = newValue ?? 'Male'),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Age'),
-                        _buildDropdown(
-                          value: selectedAge,
-                          items: List.generate(100, (index) => index + 1),
-                          onChanged: (int? newValue) =>
-                              setState(() => selectedAge = newValue ?? 18),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Weight'),
-                        _buildTextField(weightController, suffixText: 'kg'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildLabel('Height'),
-                        _buildTextField(heightController, suffixText: 'cm'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 40),
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color.fromARGB(255, 10, 33, 210).withOpacity(0.3),
-                      Colors.cyan.withOpacity(0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ElevatedButton(
-                  onPressed: saveProfileDetails,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        Colors.transparent, // Make background transparent
-                    shadowColor: Colors.transparent, // Remove shadow
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Save Changes',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildField(String label, TextEditingController controller,
+      {TextInputType? inputType}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: TextFormField(
+        controller: controller,
+        keyboardType: inputType,
+        style: const TextStyle(color: Colors.white),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: Colors.white70),
+          filled: true,
+          fillColor: Colors.black26,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     );

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ForgotPage extends StatefulWidget {
   const ForgotPage({super.key});
@@ -25,23 +26,37 @@ class _ForgotPageState extends State<ForgotPage> {
     return null;
   }
 
-  void showMessage(String msg) {
+  void showMessage(String msg, {Color bgColor = Colors.blue}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: Colors.blue[700],
+        backgroundColor: bgColor,
       ),
     );
   }
 
-  void resetPassword() {
+  Future<void> resetPassword() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() {
-      message = "Reset functionality removed.";
-    });
+    final email = emailController.text.trim();
 
-    showMessage(message);
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      setState(() {
+        message = "Reset link sent to $email";
+      });
+      showMessage("Reset link sent to $email", bgColor: Colors.green);
+    } on FirebaseAuthException catch (e) {
+      setState(() {
+        message = e.message ?? "An error occurred";
+      });
+      showMessage(message, bgColor: Colors.red);
+    } catch (e) {
+      setState(() {
+        message = "An unexpected error occurred";
+      });
+      showMessage(message, bgColor: Colors.red);
+    }
   }
 
   @override

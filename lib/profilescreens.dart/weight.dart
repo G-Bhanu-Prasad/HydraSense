@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'height.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_application_2/models/user_profile.dart';
 
 class WeightSelectionScreen extends StatefulWidget {
-  const WeightSelectionScreen({super.key});
+  final UserData userData;
+
+  const WeightSelectionScreen({super.key, required this.userData});
 
   @override
   WeightSelectionScreenState createState() => WeightSelectionScreenState();
@@ -28,11 +31,15 @@ class WeightSelectionScreenState extends State<WeightSelectionScreen> {
     });
   }
 
-  void _onNextPressed() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('weight', _selectedWeight);
-    Navigator.push(context,
-        MaterialPageRoute(builder: (context) => HeightSelectorScreen()));
+  void _onNextPressed() {
+    widget.userData.weight = _selectedWeight;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HeightSelectorScreen(userData: widget.userData),
+      ),
+    );
   }
 
   @override
