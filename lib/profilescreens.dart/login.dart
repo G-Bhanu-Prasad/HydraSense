@@ -3,6 +3,7 @@ import 'package:flutter_application_2/home_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'forgotpass.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -39,21 +40,56 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _login() async {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save();
+  if (_formKey.currentState!.validate()) {
+    _formKey.currentState!.save();
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: const Text('Logging in...'),
-        backgroundColor: Colors.blue[700],
-      ));
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const Center(child: CircularProgressIndicator()),
+      );
 
-      // Navigate to MainPage without Firebase authentication.
+      // Firebase Auth
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(email: _email, password: _password);
+
+              
+   
+
+      Navigator.pop(context); // Remove loading dialog
+
+      // Save email locally if needed
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      await prefs.setString('email', _email);
+         await prefs.setBool('isFirstTimeUser', false);
+
+      // Navigate to Home/Profile screen
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const ProfileDisplayScreen()),
+        MaterialPageRoute(
+          builder: (context) => const ProfileDisplayScreen(),
+        ),
       );
+    } on FirebaseAuthException catch (e) {
+      Navigator.pop(context); // Remove loading dialog
+
+      String message = 'Login failed. Please try again.';
+      if (e.code == 'user-not-found') {
+        message = 'No user found for that email.';
+      } else if (e.code == 'wrong-password') {
+        message = 'Wrong password provided.';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ));
     }
   }
+}
+
 
   @override
   Widget build(BuildContext context) {

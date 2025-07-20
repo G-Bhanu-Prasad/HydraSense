@@ -8,12 +8,15 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_application_2/steps.dart';
 import 'package:flutter_application_2/widgets/dayselectorwithslides.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'; // Import this if not already present
 import 'navbar.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:flutter_application_2/distanceprovider.dart';
 import 'package:flutter_application_2/ble_helper.dart';
+import 'package:firebase_core/firebase_core.dart'; // Firebase Core
+import 'package:firebase_auth/firebase_auth.dart'; // Firebase Auth
+import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
 
 class ProfileDisplayScreen extends StatefulWidget {
   const ProfileDisplayScreen({super.key});
@@ -72,61 +75,112 @@ class CircularProgressPainter extends CustomPainter {
       strokeWidth != oldDelegate.strokeWidth;
 }
 
-class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
+class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
+    with WidgetsBindingObserver {
   int defaultGoal = 2000;
   int dailyGoal = 2000;
   int dailyIntake = 0;
   int streak = 0;
   bool goalMetToday = false;
-  bool goalMetYesterday = false;
   late DateTime lastStreakDate;
   String selectedDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
-  Map<String, int> dailyIntakes = {};
+  Map<String, int> dailyIntakes = {}; // This will primarily be for display
   Map<String, Map<String, int>> hourlyIntakes = {};
   Map<String, Map<String, int>> hourlySteps = {};
   String userName = '';
-  bool isLoading = true;
+  bool isLoading = true; // Set to true initially
   String weatherDescription = '';
   double temperature = 0.0;
   String weatherIcon = '';
   int humidity = 0;
-  DateTime dop = DateTime.now();
-  String city = '';
+  DateTime dop = DateTime.now(); // Date of Profile creation
   int totalGoalsMet = 0;
   int totalIncompleteGoals = 0;
   int totalGoalsIncreased = 0;
   int steps = 0;
   DateTime? lastWaterIntake;
-  int? _lastAddedDistance;
+  int? _lastAddedDistance; // Track the last distance added to prevent duplicate additions
   late DistanceProvider _distanceProvider;
 
-//changed
+  // Firebase instances
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  String? _userId; // To store the current user's UID
+  StreamSubscription<DocumentSnapshot>? _userDocSubscription; // Listener for user data
+
   @override
   void initState() {
     super.initState();
-    _initializeProfileCreationDate().then((_) {
-      setState(() {
-        isLoading = false;
-      });
+    WidgetsBinding.instance.addObserver(this); // Add observer for app lifecycle
+
+    // Listen for auth state changes to get the user ID
+    _auth.authStateChanges().listen((User? user) {
+      if (user != null) {
+        setState(() {
+          _userId = user.uid;
+        });
+        debugPrint('initState: User ID set to $_userId. Initializing data...');
+        _initializeData(); // Initialize data once user is authenticated
+      } else {
+        debugPrint("initState: User is signed out. Attempting anonymous sign-in...");
+        _auth.signInAnonymously().then((_) {
+          setState(() {
+            _userId = _auth.currentUser?.uid;
+          });
+          debugPrint('initState: Signed in anonymously. User ID: $_userId. Initializing data...');
+          _initializeData();
+        }).catchError((e) {
+          debugPrint("initState: Error signing in anonymously: $e");
+          setState(() {
+            isLoading = false; // Stop loading if auth fails
+          });
+        });
+      }
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _distanceProvider = Provider.of<DistanceProvider>(context, listen: false);
       _distanceProvider.addListener(_handleDistanceChange);
     });
+  }
 
-    loadDailyData();
-    loadHourlySteps();
-    loadHourlyIntakes();
-    _loadDailyGoal();
-    getCurrentLocation();
-    _requestLocationPermission();
-    _requestPhysicalActivityPermission();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+  }
+
+  @override
+  void dispose() {
+    if (mounted) {
+      _distanceProvider.removeListener(_handleDistanceChange);
+    }
+    WidgetsBinding.instance.removeObserver(this); // Remove observer
+    _userDocSubscription?.cancel(); // Cancel the Firestore listener
+    super.dispose();
+  }
+
+  Future<void> _initializeData() async {
+    if (_userId == null) {
+      setState(() {
+        isLoading = false; // Stop loading if user ID is not available
+      });
+      debugPrint('_initializeData: _userId is null, stopping initialization.');
+      return;
+    }
+
+    debugPrint('_initializeData: Starting data initialization for user $_userId');
+    _listenToDailyDataFromFirestore();
+
+    await _initializeProfileCreationDate();
+    await loadHourlySteps();
+    await loadHourlyIntakes();
+    await _loadDailyGoal();
+    await getCurrentLocation();
+    await _requestLocationPermission();
+    await _requestPhysicalActivityPermission();
     BLEHelper.autoReconnectToLastDevice(context);
+    await _loadLastWaterIntake();
 
-    //changed
-    _loadLastWaterIntake();
-    // Fetch steps and listen for changes
     StepTrackerService().initialize().then((_) {
       setState(() {
         steps = StepTrackerService().dailySteps;
@@ -151,37 +205,19 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     final distance = _distanceProvider.distance;
     if (distance != null && distance > 0 && distance != _lastAddedDistance) {
       _lastAddedDistance = distance;
+      debugPrint('DistanceProvider: Detected distance $distance. Adding water.');
       addWater(distance);
     }
   }
 
-  @override
-  void dispose() {
-    _distanceProvider.removeListener(_handleDistanceChange);
-    super.dispose();
-  }
-
   Future<void> _reloadHomeScreen() async {
     setState(() {
-      isLoading = true;
+      isLoading = true; // Show loading indicator on refresh
     });
-
-    try {
-      await loadDailyData();
-      await _loadDailyGoal();
-      BLEHelper.autoReconnectToLastDevice(context);
-
-      final position = await Geolocator.getCurrentPosition();
-      await fetchWeather(position.latitude, position.longitude);
-
-      setState(() {});
-    } catch (e) {
-      debugPrint('Error during reload: $e');
-    } finally {
-      setState(() {
-        isLoading = false;
-      });
-    }
+    debugPrint('_reloadHomeScreen: Reloading home screen.');
+    await _initializeData();
+    final position = await Geolocator.getCurrentPosition();
+    await fetchWeather(position.latitude, position.longitude);
   }
 
   Future<void> _requestLocationPermission() async {
@@ -219,13 +255,91 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
   }
 
   void _autoreloadHomeScreen() {
-    // Replace the current screen with the home screen
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => ProfileDisplayScreen()),
+      MaterialPageRoute(builder: (context) => const ProfileDisplayScreen()),
     );
   }
 
-  Future<void> loadDailyData() async {
+  void _listenToDailyDataFromFirestore() {
+    if (_userId == null) {
+      debugPrint('_listenToDailyDataFromFirestore: _userId is null, cannot listen.');
+      return;
+    }
+
+    _userDocSubscription?.cancel(); // Cancel previous subscription if any
+    debugPrint('_listenToDailyDataFromFirestore: Setting up Firestore listener for user $_userId');
+
+    _userDocSubscription = _firestore
+        .collection('users')
+        .doc(_userId)
+        .snapshots()
+        .listen((DocumentSnapshot userDoc) async {
+      if (userDoc.exists) {
+        Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+        debugPrint('Firestore Listener: Received data for user $_userId. Data: $userData');
+
+        setState(() {
+          userName = userData['userName'] ?? 'User';
+          defaultGoal = userData['defaultGoal'] ?? 2000;
+          streak = userData['streak'] ?? 0;
+          totalGoalsMet = userData['totalGoalsMet'] ?? 0;
+          totalIncompleteGoals = userData['totalIncompleteGoals'] ?? 0;
+          totalGoalsIncreased = userData['totalGoalsIncreased'] ?? 0;
+
+          Map<String, dynamic> firestoreDailyIntakes =
+              userData['dailyIntakes'] ?? {};
+          dailyIntakes = Map<String, int>.from(firestoreDailyIntakes
+              .map((key, value) => MapEntry(key, value as int)));
+
+          dailyIntake = dailyIntakes[selectedDate] ?? 0;
+          debugPrint('Firestore Listener setState: dailyIntake updated to $dailyIntake for selectedDate $selectedDate');
+
+          String lastUpdateDateStr = userData['lastUpdateDate'] ??
+              DateFormat('yyyy-MM-dd').format(DateTime.now());
+          lastStreakDate = DateFormat('yyyy-MM-dd').parse(lastUpdateDateStr);
+
+          String todayStr = DateFormat('yyyy-MM-dd').format(DateTime.now());
+          goalMetToday = userData['lastStreakUpdate'] == todayStr;
+
+          if (dailyIntake >= dailyGoal && !goalMetToday) {
+            checkStreak();
+          }
+
+          if (isLoading) {
+            isLoading = false;
+            debugPrint('Firestore Listener setState: isLoading set to false.');
+          }
+        });
+      } else {
+        debugPrint('Firestore Listener: User document does not exist. Creating initial document.');
+        await _firestore.collection('users').doc(_userId).set({
+          'userName': 'User',
+          'defaultGoal': 2000,
+          'dailyIntakes': {},
+          'streak': 0,
+          'lastUpdateDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+          'lastStreakUpdate': '',
+          'totalGoalsMet': 0,
+          'totalIncompleteGoals': 0,
+          'totalGoalsIncreased': 0,
+          'profileCreationDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+          'dailyGoal': dailyGoal,
+          'hourlyIntakes': {},
+          'hourlySteps': {},
+          'lastWaterIntake': null,
+        });
+        debugPrint('New user document created in Firestore.');
+      }
+    }, onError: (error) {
+      debugPrint('Error listening to user document: $error');
+      loadDailyDataFromSharedPreferences();
+      setState(() {
+        isLoading = false;
+      });
+    });
+  }
+
+  Future<void> loadDailyDataFromSharedPreferences() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       userName = prefs.getString('userName') ?? 'User';
@@ -255,8 +369,10 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
       goalMetToday = prefs.getString('lastStreakUpdate') == todayStr;
 
       if (dailyIntake >= dailyGoal && !goalMetToday) {
-        checkStreak(prefs);
+        checkStreak();
       }
+      isLoading = false;
+      debugPrint('Loaded data from SharedPreferences. dailyIntake: $dailyIntake');
     });
   }
 
@@ -266,7 +382,13 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     setState(() {
       dailyGoal = (calculatedGoal * 1000).toInt();
     });
+    if (_userId != null) {
+      await _firestore.collection('users').doc(_userId).update({
+        'dailyGoal': dailyGoal,
+      }).catchError((e) => debugPrint("Error updating dailyGoal in Firestore: $e"));
+    }
     await prefs.setInt('dailyGoal', dailyGoal);
+    debugPrint('_loadDailyGoal: Daily goal set to $dailyGoal ml.');
   }
 
   Future<double> calculateDailyWaterGoal() async {
@@ -317,13 +439,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     return totalIntake;
   }
 
-  Future<void> _saveDailyGoal(int goal) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('dailyGoal', goal);
-  }
-
-  // Add this for date formatting
-
   Future<void> _increaseDailyGoal() async {
     final TextEditingController inputController = TextEditingController();
 
@@ -369,7 +484,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                   ),
                   child: Row(
                     children: [
-                      // Icon(Icons.water_drop, color: Colors.blue.shade300),
                       const SizedBox(width: 10),
                       Text(
                         'Adjust Daily Goal',
@@ -458,22 +572,24 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                           onPressed: () async {
                             final input = int.tryParse(inputController.text);
                             if (input != null && input > 0) {
-                              SharedPreferences prefs =
-                                  await SharedPreferences.getInstance();
-
                               setState(() {
                                 dailyGoal += input;
                                 totalGoalsIncreased += 1;
                               });
 
-                              // Save updated goal & date
+                              if (_userId != null) {
+                                await _firestore.collection('users').doc(_userId).update({
+                                  'dailyGoal': dailyGoal,
+                                  'totalGoalsIncreased': totalGoalsIncreased,
+                                  'lastUpdateDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+                                });
+                                debugPrint('_increaseDailyGoal: Updated dailyGoal to $dailyGoal in Firestore.');
+                              }
+                              SharedPreferences prefs = await SharedPreferences.getInstance();
                               prefs.setInt('dailyGoal', dailyGoal);
-                              prefs.setInt(
-                                  'totalGoalsIncreased', totalGoalsIncreased);
-                              prefs.setString(
-                                  'lastUpdatedDate',
-                                  DateFormat('yyyy-MM-dd')
-                                      .format(DateTime.now()));
+                              prefs.setInt('totalGoalsIncreased', totalGoalsIncreased);
+                              prefs.setString('lastUpdateDate', DateFormat('yyyy-MM-dd').format(DateTime.now()));
+                              debugPrint('_increaseDailyGoal: Updated dailyGoal to $dailyGoal in SharedPreferences.');
                             }
                             Navigator.of(context).pop();
                           },
@@ -510,7 +626,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     LocationPermission permission = await Geolocator.checkPermission();
 
     if (!serviceEnabled || permission == LocationPermission.deniedForever) {
-      print("Location services are disabled or permission denied.");
+      debugPrint("Location services are disabled or permission denied.");
       return;
     }
 
@@ -542,8 +658,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
           humidity = data['main']['humidity'];
           weatherIcon = data['weather'][0]['icon'];
         });
+        debugPrint('Weather fetched: $weatherDescription, $temperature°C');
 
-        // Save weather data to SharedPreferences for offline use
         SharedPreferences prefs = await SharedPreferences.getInstance();
         await prefs.setString('weatherDescription', weatherDescription);
         await prefs.setDouble('temperature', temperature);
@@ -553,64 +669,77 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
         throw Exception('failed to load weather data');
       }
     } catch (e) {
-      print('Error fetching weather:$e');
+      debugPrint('Error fetching weather:$e');
 
-      // If the network is unavailable, fetch from SharedPreferences
       SharedPreferences prefs = await SharedPreferences.getInstance();
       setState(() {
         weatherDescription =
             prefs.getString('weatherDescription') ?? 'No weather data';
         temperature = prefs.getDouble('temperature') ?? 0.0;
         if (weatherDescription == 'No weather data') {
-          humidity = -1; // Special value to indicate no internet
+          humidity = -1;
         } else {
           humidity = prefs.getInt('humidity') ?? 0;
         }
         weatherIcon = prefs.getString('weatherIcon') ?? '';
       });
+      debugPrint('Loaded weather from SharedPreferences: $weatherDescription, $temperature°C');
     }
   }
 
-  void checkStreak(SharedPreferences prefs) {
+  void checkStreak() async {
+    if (_userId == null) return;
+
     DateTime today = DateTime.now();
     String todayStr = DateFormat('yyyy-MM-dd').format(today);
 
-    // Increment streak only if it hasn't already been updated for today
     if (!goalMetToday) {
-      streak += 1;
+      setState(() {
+        streak += 1;
+        goalMetToday = true;
+      });
+      await _firestore.collection('users').doc(_userId).update({
+        'streak': streak,
+        'lastStreakUpdate': todayStr,
+      }).catchError((e) => debugPrint("Error updating streak in Firestore: $e"));
+      SharedPreferences prefs = await SharedPreferences.getInstance();
       prefs.setInt('streak', streak);
       prefs.setString('lastStreakUpdate', todayStr);
-      goalMetToday = true;
+      debugPrint('Streak updated to $streak. goalMetToday: $goalMetToday');
     }
   }
 
   Future<void> updateDailyIntake(int intake) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (_userId == null) return;
+
+    // Update the local map first
     dailyIntakes[selectedDate] = intake;
+
+    await _firestore.collection('users').doc(_userId).update({
+      'dailyIntakes.$selectedDate': intake,
+    }).catchError((e) => debugPrint("Error updating dailyIntake in Firestore: $e"));
+    debugPrint('updateDailyIntake: Firestore updated dailyIntakes.$selectedDate to $intake');
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     String dailyIntakesJson = jsonEncode(dailyIntakes);
     await prefs.setString('dailyIntakes', dailyIntakesJson);
+    debugPrint('updateDailyIntake: SharedPreferences updated dailyIntakes to $dailyIntakesJson');
 
-    if (dailyIntake >= dailyGoal && !goalMetToday) {
-      checkStreak(prefs);
+    if (intake >= dailyGoal && !goalMetToday) { // Use 'intake' parameter directly
+      checkStreak();
     }
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-
-    final provider = Provider.of<DistanceProvider>(context);
-    final distance = provider.distance;
-
-    if (distance != null && distance > 0 && distance != _lastAddedDistance) {
-      _lastAddedDistance = distance; // Mark as added so it doesn’t repeat
-      addWater(distance); // Your existing method
-    }
   }
 
   void addWater(int amount) async {
     DateTime today = DateTime.now();
     String todayDate = DateFormat('yyyy-MM-dd').format(today);
+
+    debugPrint('addWater: Attempting to add $amount ml. selectedDate: $selectedDate, todayDate: $todayDate');
 
     if (selectedDate != todayDate) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -619,31 +748,43 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
           backgroundColor: Colors.pink.shade700,
         ),
       );
+      debugPrint('addWater: Blocked update for past date.');
       return;
     }
 
-    setState(() {
-      dailyIntake += amount;
-      dailyIntakes[selectedDate] = dailyIntake;
-    });
-    //changed
-    await updateHourlyIntake(amount);
+    // Calculate the new daily intake based on the current value in dailyIntakes map
+    // The UI will update when the Firestore listener receives the new data.
+    int newDailyIntake = (dailyIntakes[selectedDate] ?? 0) + amount;
+    debugPrint('addWater: Calculated new dailyIntake: $newDailyIntake');
+
+    // Update last water intake time locally and persist
+    lastWaterIntake = DateTime.now();
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('lastWaterIntake', DateTime.now().toIso8601String());
-    updateDailyIntake(dailyIntake);
+    debugPrint('addWater: lastWaterIntake updated in SharedPreferences.');
+
+    // Trigger Firestore updates. The UI will react via the Firestore listener.
+    await updateHourlyIntake(amount);
+    await updateDailyIntake(newDailyIntake); // Pass the calculated new value
+    debugPrint('addWater: updateDailyIntake and updateHourlyIntake called for persistence.');
   }
 
   Future<void> _initializeProfileCreationDate() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String profileCreationDateString =
-        prefs.getString('profileCreationDate') ?? '';
+    if (_userId == null) return;
 
-    if (profileCreationDateString.isNotEmpty) {
+    DocumentSnapshot userDoc =
+        await _firestore.collection('users').doc(_userId).get();
+
+    if (userDoc.exists && userDoc.data() != null && (userDoc.data() as Map<String, dynamic>).containsKey('profileCreationDate')) {
+      String profileCreationDateString = userDoc['profileCreationDate'];
       dop = DateFormat('yyyy-MM-dd').parse(profileCreationDateString);
+      debugPrint('_initializeProfileCreationDate: Loaded DOP from Firestore: $dop');
     } else {
       dop = DateTime.now();
-      await prefs.setString(
-          'profileCreationDate', DateFormat('yyyy-MM-dd').format(dop));
+      await _firestore.collection('users').doc(_userId).set({
+        'profileCreationDate': DateFormat('yyyy-MM-dd').format(dop),
+      }, SetOptions(merge: true)).catchError((e) => debugPrint("Error setting profileCreationDate in Firestore: $e"));
+      debugPrint('_initializeProfileCreationDate: Set new DOP to Firestore: $dop');
     }
     setState(() {});
   }
@@ -712,14 +853,46 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     }
   }
 
-  Future<void> _loadLastWaterIntake() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? lastIntakeString = prefs.getString('lastWaterIntake');
+  String _getGoalProgressMessage(int currentIntake, int goal) {
+    if (goal <= 0) {
+      return "Set a daily goal to track your progress!";
+    }
+    double progressPercentage = (currentIntake / goal) * 100;
+    if (progressPercentage >= 100) {
+      return "Fantastic! You've met your daily hydration goal. Keep it up!";
+    } else if (progressPercentage >= 75) {
+      return "Almost there! You're close to reaching your daily goal.";
+    } else if (progressPercentage >= 50) {
+      return "Halfway point! Keep going to hit your daily hydration target.";
+    } else if (progressPercentage > 0) {
+      return "Good start! Remember to keep sipping towards your goal.";
+    } else {
+      return "Let's get started! Begin tracking your water intake for today.";
+    }
+  }
 
-    if (lastIntakeString != null) {
-      setState(() {
-        lastWaterIntake = DateTime.parse(lastIntakeString);
-      });
+  Future<void> _loadLastWaterIntake() async {
+    if (_userId == null) return;
+
+    DocumentSnapshot userDoc =
+        await _firestore.collection('users').doc(_userId).get();
+    if (userDoc.exists && userDoc.data() != null && (userDoc.data() as Map<String, dynamic>).containsKey('lastWaterIntake')) {
+      String? lastIntakeString = userDoc['lastWaterIntake'];
+      if (lastIntakeString != null) {
+        setState(() {
+          lastWaterIntake = DateTime.parse(lastIntakeString);
+        });
+        debugPrint('_loadLastWaterIntake: Loaded lastWaterIntake from Firestore: $lastWaterIntake');
+      }
+    } else {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? lastIntakeString = prefs.getString('lastWaterIntake');
+      if (lastIntakeString != null) {
+        setState(() {
+          lastWaterIntake = DateTime.parse(lastIntakeString);
+        });
+        debugPrint('_loadLastWaterIntake: Loaded lastWaterIntake from SharedPreferences: $lastWaterIntake');
+      }
     }
   }
 
@@ -733,6 +906,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
         Icon(icon, color: Colors.white70),
         const SizedBox(width: 8),
         Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               title,
@@ -777,17 +951,34 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
   }
 
   Future<void> loadHourlyIntakes() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? jsonString = prefs.getString('hourlyIntakes');
-    if (jsonString != null) {
-      Map<String, dynamic> decoded = jsonDecode(jsonString);
-      hourlyIntakes = decoded
-          .map((date, hours) => MapEntry(date, Map<String, int>.from(hours)));
+    if (_userId == null) return;
+
+    DocumentSnapshot userDoc =
+        await _firestore.collection('users').doc(_userId).get();
+    if (userDoc.exists && userDoc.data() != null && (userDoc.data() as Map<String, dynamic>).containsKey('hourlyIntakes')) {
+      Map<String, dynamic> decoded = userDoc['hourlyIntakes'];
+      setState(() {
+        hourlyIntakes = decoded
+            .map((date, hours) => MapEntry(date, Map<String, int>.from(hours)));
+      });
+      debugPrint('loadHourlyIntakes: Loaded hourlyIntakes from Firestore.');
+    } else {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? jsonString = prefs.getString('hourlyIntakes');
+      if (jsonString != null) {
+        Map<String, dynamic> decoded = jsonDecode(jsonString);
+        setState(() {
+          hourlyIntakes = decoded
+              .map((date, hours) => MapEntry(date, Map<String, int>.from(hours)));
+        });
+        debugPrint('loadHourlyIntakes: Loaded hourlyIntakes from SharedPreferences.');
+      }
     }
   }
 
   Future<void> updateHourlyIntake(int amount) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (_userId == null) return;
+
     String date = DateFormat('yyyy-MM-dd').format(DateTime.now());
     String hour = DateFormat('HH').format(DateTime.now());
 
@@ -796,30 +987,62 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
     }
 
     hourlyIntakes[date]![hour] = (hourlyIntakes[date]![hour] ?? 0) + amount;
+
+    await _firestore.collection('users').doc(_userId).update({
+      'hourlyIntakes.$date.$hour': hourlyIntakes[date]![hour],
+    }).catchError((e) => debugPrint("Error updating hourlyIntake in Firestore: $e"));
+    debugPrint('updateHourlyIntake: Firestore updated hourlyIntakes.$date.$hour to ${hourlyIntakes[date]![hour]}');
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('hourlyIntakes', jsonEncode(hourlyIntakes));
+    debugPrint('updateHourlyIntake: SharedPreferences updated hourlyIntakes.');
   }
 
   Future<void> updateHourlySteps(int stepsCount) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
+    if (_userId == null) return;
+
     String date = DateFormat('yyyy-MM-dd').format(DateTime.now());
     String hour = DateFormat("HH").format(DateTime.now());
     if (!hourlySteps.containsKey(date)) {
       hourlySteps[date] = {};
     }
     hourlySteps[date]![hour] = (hourlySteps[date]![hour] ?? 0) + stepsCount;
+
+    await _firestore.collection('users').doc(_userId).update({
+      'hourlySteps.$date.$hour': hourlySteps[date]![hour],
+    }).catchError((e) => debugPrint("Error updating hourlySteps in Firestore: $e"));
+    debugPrint('updateHourlySteps: Firestore updated hourlySteps.$date.$hour to ${hourlySteps[date]![hour]}');
+
+    SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('hourlySteps', jsonEncode(hourlySteps));
+    debugPrint('updateHourlySteps: SharedPreferences updated hourlySteps.');
   }
 
   Future<void> loadHourlySteps() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String? jsonString = prefs.getString('hourlySteps');
-    if (jsonString != null) {
-      Map<String, dynamic> decoded = jsonDecode(jsonString);
+    if (_userId == null) return;
+
+    DocumentSnapshot userDoc =
+        await _firestore.collection('users').doc(_userId).get();
+    if (userDoc.exists && userDoc.data() != null && (userDoc.data() as Map<String, dynamic>).containsKey('hourlySteps')) {
+      Map<String, dynamic> decoded = userDoc['hourlySteps'];
       setState(() {
         hourlySteps = decoded.map(
           (date, hours) => MapEntry(date, Map<String, int>.from(hours)),
         );
       });
+      debugPrint('loadHourlySteps: Loaded hourlySteps from Firestore.');
+    } else {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      String? jsonString = prefs.getString('hourlySteps');
+      if (jsonString != null) {
+        Map<String, dynamic> decoded = jsonDecode(jsonString);
+        setState(() {
+          hourlySteps = decoded.map(
+            (date, hours) => MapEntry(date, Map<String, int>.from(hours)),
+          );
+        });
+        debugPrint('loadHourlySteps: Loaded hourlySteps from SharedPreferences.');
+      }
     }
   }
 
@@ -827,21 +1050,16 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    final horizontalPadding = screenWidth * 0.05;
-    final verticalPadding = screenHeight * 0.02;
-    double progress = dailyIntake / dailyGoal;
+    double progress = dailyGoal > 0 ? dailyIntake / dailyGoal : 0.0;
     final distance = context.watch<DistanceProvider>().distance;
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (!didPop) {
-          SystemNavigator.pop(); // This closes the app
+          SystemNavigator.pop();
         }
       },
-
-      // Prevents going back
-
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0E21),
         appBar: AppBar(
@@ -849,7 +1067,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
           backgroundColor: const Color(0xFF0A0E21),
           elevation: 0,
           automaticallyImplyLeading: false,
-          //systemOverlayStyle: SystemUiOverlayStyle.light,
           toolbarHeight: 75,
           flexibleSpace: Container(
             margin: const EdgeInsets.symmetric(horizontal: 0),
@@ -895,7 +1112,13 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
             ),
           ),
         ),
-        body: Padding(
+        body: isLoading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                ),
+              )
+            : Padding(
           padding: const EdgeInsets.symmetric(horizontal: 0),
           child: RefreshIndicator(
             onRefresh: _reloadHomeScreen,
@@ -947,8 +1170,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       color: Colors.cyan.shade900.withOpacity(0.05),
-                      // color: const Color.fromARGB(255, 17, 51, 82)
-                      //     .withOpacity(0.2),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Column(
@@ -991,14 +1212,11 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                     ),
                   ),
                   SizedBox(height: screenHeight * 0.02),
-                  // Day Selector
                   Container(
-                    padding: EdgeInsets.only(left: 8, right: 8),
-                    //width: 10,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     height: screenHeight * 0.14,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF0A0E21),
-                      //borderRadius: BorderRadius.circular(15),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF0A0E21),
                     ),
                     child: Center(
                       child: DaySelectorWithSlides(
@@ -1012,6 +1230,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                           setState(() {
                             selectedDate = date;
                             dailyIntake = dailyIntakes[date] ?? 0;
+                            debugPrint('DaySelector: Selected date changed to $selectedDate. dailyIntake: $dailyIntake');
                           });
                         },
                       ),
@@ -1019,7 +1238,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                   ),
                   SizedBox(height: screenHeight * 0.02),
 
-                  // Circular Progress
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
@@ -1065,7 +1283,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                             height: 150,
                             padding: const EdgeInsets.all(15),
                             decoration: BoxDecoration(
-                              //color: Colors.white.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Column(
@@ -1074,7 +1291,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    //const SizedBox(width: 8),
                                     Text(
                                       'Daily Intake',
                                       style: GoogleFonts.inter(
@@ -1083,14 +1299,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                                         color: Colors.white,
                                       ),
                                     ),
-                                    // const Icon(
-                                    //   Icons.water_drop,
-                                    //   color: Colors.blue,
-                                    //   size: 15,
-                                    // ),
                                   ],
                                 ),
-                                //const SizedBox(height: 15),
                                 Text(
                                   '$dailyIntake ml',
                                   style: GoogleFonts.inter(
@@ -1099,7 +1309,6 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                                     color: Colors.white,
                                   ),
                                 ),
-                                // const SizedBox(height: 8),
                                 Text(
                                   'of $dailyGoal ml goal',
                                   style: GoogleFonts.inter(
@@ -1183,8 +1392,13 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                           ),
                           const SizedBox(height: 12),
                           _buildSuggestionItem(
+                            icon: Icons.show_chart,
+                            text: _getGoalProgressMessage(dailyIntake, dailyGoal),
+                          ),
+                          const SizedBox(height: 12),
+                          _buildSuggestionItem(
                             icon: Icons.trending_up,
-                            text: "You're 8 days into your hydration streak!",
+                            text: "You're $streak days into your hydration streak!",
                           ),
                         ],
                       ),
@@ -1192,210 +1406,19 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen> {
                   ),
                   Text(
                     distance != null ? 'Distance: $distance cm' : 'Waiting...',
-                    style: TextStyle(fontSize: 20),
+                    style: const TextStyle(fontSize: 20, color: Colors.white70),
                   ),
-                  // Consumer<DistanceProvider>(
-                  //   builder: (context, provider, child) {
-                  //     if (provider.distance == null) {
-                  //       return const CircularProgressIndicator(); // or a default message
-                  //     } else {
-                  //       return Text(
-                  //         "${provider.distance} ml",
-                  //         style: const TextStyle(
-                  //           fontSize: 24,
-                  //           fontWeight: FontWeight.bold,
-                  //           color: Colors.green,
-                  //         ),
-                  //       );
-                  //     }
-                  //   },
-                  // ),
-                  //SizedBox(height: screenHeight * 0.001),
-
-                  // Stats Row
-                  // Wrap(
-                  //   spacing: screenWidth * 0.008,
-                  //   runSpacing: screenHeight * 0.02,
-                  //   alignment: WrapAlignment.center,
-                  //   children: [
-                  //     _buildStatCard("Reached", "${(progress * 100).toInt()}%",
-                  //         "of Goal", Icons.auto_graph),
-                  //     _buildStatCard(
-                  //         "Temperature", "$temperature°C", "", Icons.thermostat),
-                  //     Container(
-                  //       width: screenWidth * 0.29,
-                  //       height: screenHeight * 0.11,
-                  //       decoration: BoxDecoration(
-                  //         color: Colors.blueGrey.shade200,
-                  //         borderRadius: BorderRadius.circular(15),
-                  //       ),
-                  //       child: Center(child: StepsTracker()),
-                  //     ),
-                  //   ],
-                  // ),
                   SizedBox(height: screenHeight * 0.008),
-
-                  // Weather & Increase Goal
-                  // _buildWeatherCard(screenWidth, screenHeight),
                 ],
               ),
             ),
           ),
         ),
-
-        // Bottom Navigation
         bottomNavigationBar: BottomNavBar(
           currentIndex: 0,
           addWater: () => addWater(250),
-          dailyIntakes: dailyIntakes, // Ensure this is passed
+          dailyIntakes: dailyIntakes,
         ),
-      ),
-    );
-  }
-
-  Widget _buildWeatherCard(double screenWidth, double screenHeight) {
-    return Container(
-      padding: const EdgeInsets.only(left: 15, top: 15),
-      width: double.infinity,
-      height: screenHeight * 0.22,
-      decoration: BoxDecoration(
-        color: Colors.blueGrey.shade200,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          weatherDescription,
-                          style: const TextStyle(
-                              fontSize: 18, fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(width: 8),
-                        if (weatherIcon.isNotEmpty)
-                          Image.network(
-                            'https://openweathermap.org/img/w/$weatherIcon.png',
-                            width: 30,
-                            height: 30,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return const Icon(Icons.cloud_sync,
-                                  color: Colors.white, size: 30);
-                            },
-                          ),
-                      ],
-                    ),
-                    Text(
-                      humidity == -1
-                          ? 'Turn on Internet'
-                          : 'Humidity: $humidity%   ',
-                      style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.blueGrey.shade900,
-                          fontWeight: FontWeight.w600),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  _getHydrationRecommendation(),
-                  style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.blueGrey.shade800,
-                      fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.bottomLeft,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 2, 10, 104)),
-                    onPressed: _increaseDailyGoal,
-                    child: Text('+ Increase Goal',
-                        style: TextStyle(color: Colors.blueGrey.shade100)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 9, 47, 103),
-                  borderRadius:
-                      const BorderRadius.only(bottomRight: Radius.circular(15)),
-                ),
-                child: const Icon(Icons.self_improvement_rounded,
-                    size: 30, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-// Helper function for stat cards
-  Widget _buildStatCard(
-    String title,
-    String value,
-    String subtext,
-    IconData icon,
-  ) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-
-    return Container(
-      width: screenWidth * 0.29,
-      height: screenHeight * 0.11,
-      decoration: BoxDecoration(
-        color: Colors.blueGrey.shade200,
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Stack(
-        children: [
-          Center(
-            // Ensures text is centered
-            child: Column(
-              mainAxisSize: MainAxisSize.min, // Prevents extra spacing
-              children: [
-                Text(title,
-                    style:
-                        TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                Text(value,
-                    style:
-                        TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                if (subtext.isNotEmpty)
-                  Text(subtext, style: TextStyle(fontSize: 12)),
-              ],
-            ),
-          ),
-          Positioned(
-            bottom: 0, // Adjust to move the icon up/down
-            right: 0, // Adjust to move the icon left/right
-            child: Container(
-                width: 25,
-                height: 25,
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(255, 9, 47, 103),
-                  borderRadius:
-                      BorderRadius.only(bottomRight: Radius.circular(15)),
-                ),
-                child: Icon(icon, size: 20, color: Colors.white)),
-          ),
-        ],
       ),
     );
   }

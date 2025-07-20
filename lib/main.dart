@@ -1,22 +1,23 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_application_2/profilescreens.dart/login.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_application_2/notification_service.dart';
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_application_2/profilescreens.dart/name.dart';
 import 'package:flutter_application_2/home_screen.dart';
+import 'package:flutter_application_2/notification_service.dart';
+import 'package:flutter_application_2/profilescreens.dart/login.dart';
+import 'package:flutter_application_2/profilescreens.dart/name.dart';
 import 'package:google_fonts/google_fonts.dart';
-//import 'package:flutter_application_2/profilescreens.dart/logo.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_application_2/distanceprovider.dart'; // Create this file as described below
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:flutter_application_2/foreground_task_handler.dart';
-import 'dart:io';
+import 'package:flutter_application_2/distanceprovider.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 
 @pragma('vm:entry-point')
@@ -44,7 +45,6 @@ Future<void> requestBluetoothPermissions() async {
       await Permission.ignoreBatteryOptimizations.request();
     }
 
-    // Optional: for Android 13+ notification display
     if (!await Permission.notification.isGranted) {
       await Permission.notification.request();
     }
@@ -53,7 +53,9 @@ Future<void> requestBluetoothPermissions() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   FlutterForegroundTask.initCommunicationPort();
   tz.initializeTimeZones();
@@ -64,7 +66,6 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  // Check if the user is a first-time user before launching the app
   SharedPreferences prefs = await SharedPreferences.getInstance();
   bool isFirstTimeUser = prefs.getBool('isFirstTimeUser') ?? true;
 
@@ -76,7 +77,7 @@ void main() async {
     ),
     iosNotificationOptions: IOSNotificationOptions(),
     foregroundTaskOptions: ForegroundTaskOptions(
-      eventAction: ForegroundTaskEventAction.repeat(5000), // 👈 required!
+      eventAction: ForegroundTaskEventAction.repeat(5000),
       allowWakeLock: true,
       autoRunOnBoot: true,
     ),
@@ -94,7 +95,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => DistanceProvider()),
-        ChangeNotifierProvider(create: (_) => ConnectionProvider()), // add this
+        ChangeNotifierProvider(create: (_) => ConnectionProvider()),
       ],
       child: HydraSense(isFirstTimeUser: isFirstTimeUser),
     ),
@@ -111,31 +112,48 @@ class HydraSense extends StatelessWidget {
     return MaterialApp(
       title: 'HydraSense',
       debugShowCheckedModeBanner: false,
-      home: isFirstTimeUser
-          ? const ProfileScreen()
-          : const ProfileDisplayScreen(),
+      home: AuthGate(isFirstTimeUser: isFirstTimeUser),
     );
   }
 }
 
-class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+/// ✅ AuthGate decides where to navigate based on Firebase login & first-time check
+class AuthGate extends StatelessWidget {
+  final bool isFirstTimeUser;
+
+  const AuthGate({super.key, required this.isFirstTimeUser});
 
   @override
-  ProfileScreenState createState() => ProfileScreenState();
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            backgroundColor: Color(0xFF0A0E21),
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasData) {
+          // ✅ User is signed in
+          return const ProfileDisplayScreen();
+        }
+
+        if (isFirstTimeUser) {
+          // 🆕 First-time user onboarding
+          return const ProfileScreen();
+        }
+
+        // 🔒 Not signed in
+        return const LoginPage();
+      },
+    );
+  }
 }
 
-class ProfileScreenState extends State<ProfileScreen> {
-  @override
-  void initState() {
-    super.initState();
-    //_markUserAsNotFirstTime();
-  }
-
-  // Future<void> _markUserAsNotFirstTime() async {
-  //   SharedPreferences prefs = await SharedPreferences.getInstance();
-  //   await prefs.setBool('isFirstTimeUser', false);
-  // }
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -160,15 +178,6 @@ class ProfileScreenState extends State<ProfileScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Image.asset("lib/images/wel.png"),
-              // const HydraSenseLogo(
-              //   size: 300,
-              //   showText: true,
-              // ),
-              // const HydraSenseLogo(
-              //   size: 180,
-              //   animate: false,
-              // ),
-
               const SizedBox(height: 40),
               RichText(
                 textAlign: TextAlign.center,
@@ -194,86 +203,65 @@ class ProfileScreenState extends State<ProfileScreen> {
                 style: TextStyle(color: Colors.grey, fontSize: 13),
               ),
               const SizedBox(height: 80),
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color.fromARGB(255, 10, 33, 210).withOpacity(0.3),
-                      Colors.cyan.withOpacity(0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const NameInputScreen(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Get Started',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
+              buildGradientButton(
+                context,
+                label: 'Get Started',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (context) => const NameInputScreen()),
+                  );
+                },
               ),
               const SizedBox(height: 15),
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      const Color.fromARGB(255, 10, 33, 210).withOpacity(0.3),
-                      Colors.cyan.withOpacity(0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const LoginPage(),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.transparent,
-                    shadowColor: Colors.transparent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'Sign in',
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
+              buildGradientButton(
+                context,
+                label: 'Sign in',
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const LoginPage()),
+                  );
+                },
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget buildGradientButton(BuildContext context,
+      {required String label, required VoidCallback onPressed}) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            const Color.fromARGB(255, 10, 33, 210).withOpacity(0.3),
+            Colors.cyan.withOpacity(0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
           ),
         ),
       ),

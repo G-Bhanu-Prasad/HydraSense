@@ -59,4 +59,5 @@ class DefaultFirebaseOptions {
     projectId: 'hydrasense-d711b',
     storageBucket: 'hydrasense-d711b.firebasestorage.app',
   );
+
 }
