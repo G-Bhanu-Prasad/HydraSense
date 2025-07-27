@@ -43,7 +43,7 @@ dependencies:
   geolocator: ^13.0.2
   connectivity_plus: ^6.1.1
   pedometer: ^4.0.2
-  fl_chart: ^1.0.0
+  fl_chart: 0.69.2
   google_fonts: ^4.0.3
   provider: ^6.1.2
   flutter_reactive_ble: ^5.4.0

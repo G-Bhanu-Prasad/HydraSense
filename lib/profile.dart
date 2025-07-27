@@ -14,25 +14,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_application_2/profilescreens.dart/name.dart'; // Import NameInputScreen
 import 'package:flutter_application_2/models/user_profile.dart'; // Assuming UserData model is here
 
-// UserData model (if not already defined in models/user_profile.dart)
-// class UserData {
-//   final String userName;
-//   final int age;
-//   final String gender;
-//   final double height;
-//   final double weight;
-//   final String email;
-
-//   UserData({
-//     required this.userName,
-//     required this.age,
-//     required this.gender,
-//     required this.height,
-//     required this.weight,
-//     required this.email,
-//   });
-// }
-
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -229,7 +210,7 @@ class _ProfilePageState extends State<ProfilePage> {
     bool confirm = await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.grey[900],
+        backgroundColor: const Color(0xFF1E2A3A),
         title: Text('Confirm Account Deletion',
             style: GoogleFonts.inter(color: Colors.white)),
         content: Text(
@@ -238,13 +219,11 @@ class _ProfilePageState extends State<ProfilePage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text('Cancel',
-                style: GoogleFonts.inter(color: Colors.blue)),
+            child: Text('Cancel', style: GoogleFonts.inter(color: Colors.blue)),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text('Delete',
-                style: GoogleFonts.inter(color: Colors.red)),
+            child: Text('Delete', style: GoogleFonts.inter(color: Colors.red)),
           ),
         ],
       ),
@@ -282,9 +261,6 @@ class _ProfilePageState extends State<ProfilePage> {
       } on FirebaseAuthException catch (e) {
         String message;
         if (e.code == 'requires-recent-login') {
-          // This error can still occur if the user's last sign-in was too long ago.
-          // Firebase requires a recent re-authentication for sensitive operations like deletion.
-          // The user would need to log out and log back in to refresh their token.
           message =
               "This operation is sensitive and requires recent authentication. Please log out and log in again, then try deleting your account.";
         } else {
@@ -310,17 +286,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  // Helper to get avatar image URL based on gender
-  String _getAvatarImageUrl(String? gender) {
-    if (gender == 'Male') {
-      return 'https://placehold.co/120x120/007bff/ffffff?text=MALE';
-    } else if (gender == 'Female') {
-      return 'https://placehold.co/120x120/ff69b4/ffffff?text=FEMALE';
-    } else {
-      return 'https://placehold.co/120x120/6c757d/ffffff?text=OTHER';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -336,13 +301,12 @@ class _ProfilePageState extends State<ProfilePage> {
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0E21),
         appBar: AppBar(
-          automaticallyImplyLeading: true,
           backgroundColor: const Color(0xFF0A0E21),
           scrolledUnderElevation: 0,
           elevation: 0,
           leading: IconButton(
             icon:
-                const Icon(Icons.arrow_back_ios, color: Colors.white, size: 20),
+                const Icon(Icons.arrow_back_ios, color: Colors.white, size: 24),
             onPressed: () {
               Navigator.pushReplacement(
                 context,
@@ -352,7 +316,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
           title: Text(
             'Profile',
-            style: GoogleFonts.poppins(
+            style: GoogleFonts.inter(
               color: Colors.white,
               fontSize: 20,
               fontWeight: FontWeight.w600,
@@ -362,330 +326,38 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         body: _isLoading
             ? Center(
-                child: CircularProgressIndicator(color: Colors.blue.shade400),
+                child: CircularProgressIndicator(color: Colors.teal),
               )
-            : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Profile Section
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.blue.withOpacity(0.2),
-                              Colors.cyan.shade900.withOpacity(0.1),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Row(
-                          children: [
-                            // Avatar Image
-                            CircleAvatar(
-                              radius: 40,
-                              backgroundColor:
-                                  Colors.blue.shade800.withOpacity(0.7),
-                              child: ClipOval(
-                                child: Image.network(
-                                  _getAvatarImageUrl(_userData?.gender),
-                                  width: 80,
-                                  height: 80,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Icon(
-                                      Icons.person,
-                                      size: 50,
-                                      color: Colors.white,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    _userData?.userName ?? 'Guest User',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _userData?.email ?? 'No Email',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  // Displaying other profile data
-                                  Text(
-                                    'Age: ${_userData?.age ?? 'N/A'}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Gender: ${_userData?.gender ?? 'N/A'}',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Height: ${_userData?.height?.toStringAsFixed(0) ?? 'N/A'} cm',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Weight: ${_userData?.weight?.toStringAsFixed(1) ?? 'N/A'} kg',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 14,
-                                      color: Colors.white70,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.edit_outlined,
-                                  color: Colors.white, size: 24),
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (context) =>
-                                        const ProfileEditScreen(),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(15.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // User Greeting Section
+                    _buildUserGreetingSection(),
+                    const SizedBox(height: 32),
 
-                      const SizedBox(height: 24),
+                    // General Section
+                    _buildSectionHeader('General'),
+                    const SizedBox(height: 16),
+                    _buildGeneralSection(),
+                    const SizedBox(height: 32),
 
-                      // General Section
-                      _buildSectionHeader('General'),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.black.withOpacity(0.2),
-                              Colors.lightBlue.withOpacity(0.2),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildNotificationSchedulingTile(), // New notification tile
-                            _buildListTile(
-                              icon: Icons.password_rounded,
-                              title: 'Change Password',
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          ChangePasswordPage()),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
+                    // Permissions Section
+                    _buildSectionHeader('Permissions'),
+                    const SizedBox(height: 16),
+                    _buildPermissionsSection(),
+                    const SizedBox(height: 32),
 
-                      const SizedBox(height: 24),
+                    // Support Section
+                    _buildSectionHeader('Support'),
+                    const SizedBox(height: 16),
+                    _buildSupportSection(),
+                    const SizedBox(height: 0),
 
-                      // Permissions Section
-                      _buildSectionHeader('Permissions'),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.black.withOpacity(0.2),
-                              Colors.lightBlue.withOpacity(0.2),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildPermissionTile(
-                              icon: Icons.notifications_none_outlined,
-                              title: 'Notifications',
-                              subtitle: 'Enable hydration reminders',
-                              value: _notificationPermissionGranted,
-                              onChanged: () => handlePermissionToggle(
-                                  Permission.notification, "Notification"),
-                            ),
-                            _buildPermissionTile(
-                              icon: Icons.location_on_outlined,
-                              title: 'Location',
-                              subtitle: 'Required to obtain weather',
-                              value: _locationPermissionGranted,
-                              onChanged: () => handlePermissionToggle(
-                                  Permission.location, "Location"),
-                            ),
-                            _buildPermissionTile(
-                              icon: Icons.directions_run_outlined,
-                              title: 'Physical Activity',
-                              subtitle: 'Required for Step count',
-                              value: _activityPermissionGranted,
-                              onChanged: () => handlePermissionToggle(
-                                  Permission.activityRecognition,
-                                  "Physical Activity"),
-                            ),
-                            _buildPermissionTile(
-                              // Added Bluetooth permission tile
-                              icon: Icons.bluetooth_outlined,
-                              title: 'Bluetooth',
-                              subtitle: 'Required for bottle connection',
-                              value: _bluetoothPermissionGranted,
-                              onChanged: () => handlePermissionToggle(
-                                  Permission.bluetooth, "Bluetooth"),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Support Section
-                      _buildSectionHeader('Support'),
-                      Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              Colors.black.withOpacity(0.2),
-                              Colors.lightBlue.withOpacity(0.2),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(15),
-                        ),
-                        child: Column(
-                          children: [
-                            _buildListTile(
-                              icon: Icons.info_outline,
-                              title: 'About Us',
-                              onTap: () {
-                                // Implement navigation to About Us screen
-                              },
-                            ),
-                            _buildListTile(
-                              icon: Icons.phone_outlined,
-                              title: 'Contact Us',
-                              onTap: () {
-                                // Implement navigation to Contact Us screen
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(height: 24),
-
-                      // Exit Buttons
-                      _buildListTile(
-                        icon: Icons.logout,
-                        title: 'Logout',
-                        textColor: Colors.white,
-                        iconColor: Colors.white,
-                        onTap: () async {
-                          bool confirm = await showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              backgroundColor: Colors.grey[900],
-                              title: Text('Confirm Logout',
-                                  style:
-                                      GoogleFonts.inter(color: Colors.white)),
-                              content: Text('Are you sure you want to logout?',
-                                  style:
-                                      GoogleFonts.inter(color: Colors.white70)),
-                              actions: [
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(false),
-                                  child: Text('Cancel',
-                                      style: GoogleFonts.inter(
-                                          color: Colors.blue)),
-                                ),
-                                TextButton(
-                                  onPressed: () =>
-                                      Navigator.of(context).pop(true),
-                                  child: Text('Logout',
-                                      style:
-                                          GoogleFonts.inter(color: Colors.red)),
-                                ),
-                              ],
-                            ),
-                          );
-
-                          if (confirm) {
-                            try {
-                              await _auth.signOut();
-                              SharedPreferences prefs =
-                                  await SharedPreferences.getInstance();
-                              await prefs.clear();
-                              await _notificationService
-                                  .cancelAllNotifications(); // Cancel notifications on logout
-
-                              if (context.mounted) {
-                                Navigator.pushAndRemoveUntil(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (context) =>
-                                          const ProfileScreen()), // Navigate to NameInputScreen
-                                  (route) => false,
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                        "Logout failed: ${e.toString()}",
-                                        style: GoogleFonts.inter()),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          }
-                        },
-                      ),
-                      _buildListTile(
-                        icon: Icons.delete_forever_rounded,
-                        title: 'Delete Account',
-                        textColor: Colors.red.shade300,
-                        iconColor: Colors.red.shade300,
-                        trailing: null,
-                        onTap: () => _deleteAccount(context),
-                      ),
-                    ],
-                  ),
+                    // Logout Section
+                    _buildLogoutSection(),
+                  ],
                 ),
               ),
         bottomNavigationBar: BottomNavBar(
@@ -696,177 +368,496 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  // Helper for section headers
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      child: Text(
-        title,
-        style: GoogleFonts.poppins(
-          fontSize: 18,
-          fontWeight: FontWeight.w600,
-          color: Colors.white,
+  // User Greeting Section
+  /// Builds the user greeting section with welcome message and profile edit option
+  Widget _buildUserGreetingSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Greeting text
+        Text(
+          'Hello',
+          style: GoogleFonts.inter(
+            fontSize: 15,
+            color: Colors.white70,
+            fontWeight: FontWeight.w400,
+          ),
         ),
-      ),
-    );
-  }
 
-  Widget _buildListTile({
-    required IconData icon,
-    required String title,
-    String? trailing,
-    required VoidCallback onTap,
-    Color textColor = Colors.white,
-    Color iconColor = Colors.white,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: iconColor, size: 24),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-          color: textColor,
-        ),
-      ),
-      trailing: trailing != null
-          ? Text(
-              trailing,
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                color: Colors.white,
+        // User name and edit profile row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            // User name display
+            Expanded(
+              child: Text(
+                _userData?.userName ?? 'Guest User',
+                style: GoogleFonts.inter(
+                  fontSize: 20,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
-            )
-          : const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
-      onTap: onTap,
+            ),
+
+            const SizedBox(width: 12),
+
+            // Edit profile button
+            _buildEditProfileButton(),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _buildPermissionTile({
+  /// Builds the edit profile button with proper styling and navigation
+  Widget _buildEditProfileButton() {
+    return GestureDetector(
+      onTap: _navigateToProfileEdit,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.white,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Edit Profile',
+              style: GoogleFonts.inter(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.edit_outlined,
+              color: Colors.white,
+              size: 14,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Navigates to the profile edit screen
+  void _navigateToProfileEdit() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ProfileEditScreen(),
+      ),
+    );
+  }
+
+  // General Section
+  Widget _buildGeneralSection() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.black.withOpacity(0.2),
+            Colors.lightBlue.withOpacity(0.2),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          // Schedule Hydration Notifications Button
+          Container(
+            margin: const EdgeInsets.all(20),
+            child: Material(
+              color: Colors.teal,
+              borderRadius: BorderRadius.circular(25),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(25),
+                onTap: () async {
+                  await _scheduleHydrationNotifications();
+                },
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Center(
+                    child: Text(
+                      'Schedule Hydration Notifications',
+                      style: GoogleFonts.inter(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Physical Information
+          _buildSimpleTile(
+            icon: Icons.monitor_weight_outlined,
+            title: 'Physical Information',
+            value:
+                '${_userData?.weight?.toStringAsFixed(1) ?? '50.0'} kg, ${_userData?.height?.toStringAsFixed(0) ?? '170'} cm',
+          ),
+          // Hydration Score
+          // _buildSimpleTile(
+          //   icon: Icons.show_chart,
+          //   title: 'Hydration Score',
+          //   value: 'Not set',
+          // ),
+          // Change Password
+          _buildSimpleTile(
+            icon: Icons.lock_outline,
+            title: 'Change Password',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => ChangePasswordPage()),
+              );
+            },
+            showArrow: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Permissions Section
+  Widget _buildPermissionsSection() {
+    return Container(
+      decoration: BoxDecoration(
+        //color: const Color(0xFF1A2332),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          _buildSimpleTile(
+            icon: Icons.notifications_none_outlined,
+            title: 'Notifications',
+            subtitle: 'Enable hydration reminders',
+            isSwitch: true,
+            switchValue: _notificationPermissionGranted,
+            onSwitchChanged: () =>
+                handlePermissionToggle(Permission.notification, "Notification"),
+          ),
+          //_buildDivider(),
+          _buildSimpleTile(
+            icon: Icons.location_on_outlined,
+            title: 'Location',
+            subtitle: 'Required to obtain weather',
+            isSwitch: true,
+            switchValue: _locationPermissionGranted,
+            onSwitchChanged: () =>
+                handlePermissionToggle(Permission.location, "Location"),
+          ),
+          //_buildDivider(),
+          _buildSimpleTile(
+            icon: Icons.directions_run_outlined,
+            title: 'Physical Activity',
+            subtitle: 'Required for Step count',
+            isSwitch: true,
+            switchValue: _activityPermissionGranted,
+            onSwitchChanged: () => handlePermissionToggle(
+                Permission.activityRecognition, "Physical Activity"),
+          ),
+          //_buildDivider(),
+          _buildSimpleTile(
+            icon: Icons.bluetooth_outlined,
+            title: 'Bluetooth',
+            subtitle: 'Required for bottle connection',
+            isSwitch: true,
+            switchValue: _bluetoothPermissionGranted,
+            onSwitchChanged: () =>
+                handlePermissionToggle(Permission.bluetooth, "Bluetooth"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Support Section
+  Widget _buildSupportSection() {
+    return Container(
+      decoration: BoxDecoration(
+        //color: const Color(0xFF1A2332),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          _buildSimpleTile(
+            icon: Icons.info_outline,
+            title: 'About Us',
+            onTap: () {
+              // Implement navigation to About Us screen
+            },
+            showArrow: true,
+          ),
+          //_buildDivider(),
+          _buildSimpleTile(
+            icon: Icons.phone_outlined,
+            title: 'Contact Us',
+            onTap: () {
+              // Implement navigation to Contact Us screen
+            },
+            showArrow: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Logout Section
+  Widget _buildLogoutSection() {
+    return Container(
+      decoration: BoxDecoration(
+        //color: const Color(0xFF1A2332),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: _buildSimpleTile(
+        icon: Icons.logout,
+        title: 'Logout',
+        textColor: Colors.red,
+        iconColor: Colors.red,
+        onTap: () async {
+          bool confirm = await showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: const Color(0xFF1E2A3A),
+              title: Text('Confirm Logout',
+                  style: GoogleFonts.inter(color: Colors.white)),
+              content: Text('Are you sure you want to logout?',
+                  style: GoogleFonts.inter(color: Colors.white70)),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: Text('Cancel',
+                      style: GoogleFonts.inter(color: Colors.blue)),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: Text('Logout',
+                      style: GoogleFonts.inter(color: Colors.red)),
+                ),
+              ],
+            ),
+          );
+
+          if (confirm) {
+            try {
+              await _auth.signOut();
+              SharedPreferences prefs = await SharedPreferences.getInstance();
+              await prefs.clear();
+              await _notificationService.cancelAllNotifications();
+
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const ProfileScreen()),
+                  (route) => false,
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text("Logout failed: ${e.toString()}",
+                        style: GoogleFonts.inter()),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          }
+        },
+        showArrow: true,
+      ),
+    );
+  }
+
+  // Helper Widgets
+  Widget _buildSectionHeader(String title) {
+    return Text(
+      title,
+      style: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildSimpleTile({
     required IconData icon,
     required String title,
     String? subtitle,
-    required bool value,
-    required VoidCallback onChanged,
+    String? value,
+    VoidCallback? onTap,
+    Color textColor = Colors.white,
+    Color iconColor = Colors.white,
+    bool showArrow = false,
+    bool isSwitch = false,
+    bool switchValue = false,
+    VoidCallback? onSwitchChanged,
   }) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white, size: 24),
-      title: Text(
-        title,
-        style: GoogleFonts.inter(
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-          color: Colors.white,
-        ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: Colors.white70,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          child: Row(
+            children: [
+              Icon(icon, color: iconColor, size: 22),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        color: textColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: Colors.white60,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
-            )
-          : null,
-      trailing: Switch(
-        value: value,
-        onChanged: (_) => onChanged(),
-        activeColor: Colors.blue,
-        inactiveThumbColor: Colors.grey.shade600,
-        inactiveTrackColor: Colors.grey.shade800,
+              if (value != null)
+                Text(
+                  value,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              if (isSwitch)
+                Switch(
+                  value: switchValue,
+                  onChanged: (_) => onSwitchChanged?.call(),
+                  activeColor: Colors.teal,
+                  inactiveThumbColor: Colors.grey.shade600,
+                  inactiveTrackColor: Colors.grey.shade800,
+                ),
+              if (showArrow)
+                const Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.white54,
+                  size: 14,
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildNotificationSchedulingTile() {
-    return ListTile(
-      leading: Icon(Icons.notifications_active_outlined,
-          color: Colors.blue.shade300, size: 24),
-      title: Text(
-        'Schedule Hydration Notifications',
-        style: GoogleFonts.inter(
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-          color: Colors.white,
-        ),
-      ),
-      trailing:
-          const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.white),
-      onTap: () async {
-        final List<Map<String, dynamic>> hydrationSchedule = [
-          {
-            "time": const TimeOfDay(hour: 5, minute: 0),
-            "message": "Start your day with a glass of water! "
-          },
-          {
-            "time": const TimeOfDay(hour: 8, minute: 0),
-            "message": "Time for your morning hydration boost!"
-          },
-          {
-            "time": const TimeOfDay(hour: 10, minute: 0),
-            "message": "Stay refreshed! Drink some water now."
-          },
-          {
-            "time": const TimeOfDay(hour: 14, minute: 0),
-            "message": "Midday hydration check: Grab a glass!"
-          },
-          {
-            "time": const TimeOfDay(hour: 18, minute: 0),
-            "message": "Evening reminder: Keep hydrating!"
-          },
-          {
-            "time": const TimeOfDay(hour: 21, minute: 0),
-            "message": "End your day right: Drink some water."
-          },
-        ];
-
-        // Clear existing notifications before scheduling new ones to avoid duplicates
-        await _notificationService.cancelAllNotifications();
-
-        for (var schedule in hydrationSchedule) {
-          final TimeOfDay time = schedule["time"];
-          final String message = schedule["message"];
-          final now = DateTime.now();
-          final DateTime scheduledDateTime = DateTime(
-            now.year,
-            now.month,
-            now.day,
-            time.hour,
-            time.minute,
-          );
-
-          // Only schedule for times in the future today, or for tomorrow if the time has passed today
-          if (scheduledDateTime.isAfter(now)) {
-            await _notificationService.scheduleHydrationNotification(
-              scheduledDateTime,
-              message,
-            );
-          } else {
-            // Schedule for tomorrow if the time has already passed today
-            final DateTime tomorrowScheduledDateTime = DateTime(
-              now.year,
-              now.month,
-              now.day + 1,
-              time.hour,
-              time.minute,
-            );
-            await _notificationService.scheduleHydrationNotification(
-              tomorrowScheduledDateTime,
-              message,
-            );
-          }
-        }
-
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Hydration notifications scheduled daily!",
-                  style: GoogleFonts.inter()),
-              backgroundColor: Colors.blue,
-            ),
-          );
-        }
-      },
+  Widget _buildDivider() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      height: 1,
+      color: Colors.white.withOpacity(0.1),
     );
+  }
+
+  Future<void> _scheduleHydrationNotifications() async {
+    final List<Map<String, dynamic>> hydrationSchedule = [
+      {
+        "time": const TimeOfDay(hour: 5, minute: 0),
+        "message": "Start your day with a glass of water! "
+      },
+      {
+        "time": const TimeOfDay(hour: 8, minute: 0),
+        "message": "Time for your morning hydration boost!"
+      },
+      {
+        "time": const TimeOfDay(hour: 10, minute: 0),
+        "message": "Stay refreshed! Drink some water now."
+      },
+      {
+        "time": const TimeOfDay(hour: 14, minute: 0),
+        "message": "Midday hydration check: Grab a glass!"
+      },
+      {
+        "time": const TimeOfDay(hour: 18, minute: 0),
+        "message": "Evening reminder: Keep hydrating!"
+      },
+      {
+        "time": const TimeOfDay(hour: 21, minute: 0),
+        "message": "End your day right: Drink some water."
+      },
+    ];
+
+    // Clear existing notifications before scheduling new ones to avoid duplicates
+    await _notificationService.cancelAllNotifications();
+
+    for (var schedule in hydrationSchedule) {
+      final TimeOfDay time = schedule["time"];
+      final String message = schedule["message"];
+      final now = DateTime.now();
+      final DateTime scheduledDateTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        time.hour,
+        time.minute,
+      );
+
+      // Only schedule for times in the future today, or for tomorrow if the time has passed today
+      if (scheduledDateTime.isAfter(now)) {
+        await _notificationService.scheduleHydrationNotification(
+          scheduledDateTime,
+          message,
+        );
+      } else {
+        // Schedule for tomorrow if the time has already passed today
+        final DateTime tomorrowScheduledDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day + 1,
+          time.hour,
+          time.minute,
+        );
+        await _notificationService.scheduleHydrationNotification(
+          tomorrowScheduledDateTime,
+          message,
+        );
+      }
+    }
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Hydration notifications scheduled daily!",
+              style: GoogleFonts.inter()),
+          backgroundColor: Colors.teal,
+        ),
+      );
+    }
   }
 }

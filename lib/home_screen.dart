@@ -17,6 +17,7 @@ import 'package:flutter_application_2/ble_helper.dart';
 import 'package:firebase_core/firebase_core.dart'; // Firebase Core
 import 'package:firebase_auth/firebase_auth.dart'; // Firebase Auth
 import 'package:cloud_firestore/cloud_firestore.dart'; // Firestore
+import 'enhancedappbar.dart';
 
 class ProfileDisplayScreen extends StatefulWidget {
   const ProfileDisplayScreen({super.key});
@@ -99,14 +100,16 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
   int totalGoalsIncreased = 0;
   int steps = 0;
   DateTime? lastWaterIntake;
-  int? _lastAddedDistance; // Track the last distance added to prevent duplicate additions
+  int?
+      _lastAddedDistance; // Track the last distance added to prevent duplicate additions
   late DistanceProvider _distanceProvider;
 
   // Firebase instances
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String? _userId; // To store the current user's UID
-  StreamSubscription<DocumentSnapshot>? _userDocSubscription; // Listener for user data
+  StreamSubscription<DocumentSnapshot>?
+      _userDocSubscription; // Listener for user data
 
   @override
   void initState() {
@@ -122,12 +125,14 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
         debugPrint('initState: User ID set to $_userId. Initializing data...');
         _initializeData(); // Initialize data once user is authenticated
       } else {
-        debugPrint("initState: User is signed out. Attempting anonymous sign-in...");
+        debugPrint(
+            "initState: User is signed out. Attempting anonymous sign-in...");
         _auth.signInAnonymously().then((_) {
           setState(() {
             _userId = _auth.currentUser?.uid;
           });
-          debugPrint('initState: Signed in anonymously. User ID: $_userId. Initializing data...');
+          debugPrint(
+              'initState: Signed in anonymously. User ID: $_userId. Initializing data...');
           _initializeData();
         }).catchError((e) {
           debugPrint("initState: Error signing in anonymously: $e");
@@ -168,7 +173,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
       return;
     }
 
-    debugPrint('_initializeData: Starting data initialization for user $_userId');
+    debugPrint(
+        '_initializeData: Starting data initialization for user $_userId');
     _listenToDailyDataFromFirestore();
 
     await _initializeProfileCreationDate();
@@ -205,7 +211,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
     final distance = _distanceProvider.distance;
     if (distance != null && distance > 0 && distance != _lastAddedDistance) {
       _lastAddedDistance = distance;
-      debugPrint('DistanceProvider: Detected distance $distance. Adding water.');
+      debugPrint(
+          'DistanceProvider: Detected distance $distance. Adding water.');
       addWater(distance);
     }
   }
@@ -262,12 +269,14 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
 
   void _listenToDailyDataFromFirestore() {
     if (_userId == null) {
-      debugPrint('_listenToDailyDataFromFirestore: _userId is null, cannot listen.');
+      debugPrint(
+          '_listenToDailyDataFromFirestore: _userId is null, cannot listen.');
       return;
     }
 
     _userDocSubscription?.cancel(); // Cancel previous subscription if any
-    debugPrint('_listenToDailyDataFromFirestore: Setting up Firestore listener for user $_userId');
+    debugPrint(
+        '_listenToDailyDataFromFirestore: Setting up Firestore listener for user $_userId');
 
     _userDocSubscription = _firestore
         .collection('users')
@@ -276,7 +285,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
         .listen((DocumentSnapshot userDoc) async {
       if (userDoc.exists) {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-        debugPrint('Firestore Listener: Received data for user $_userId. Data: $userData');
+        debugPrint(
+            'Firestore Listener: Received data for user $_userId. Data: $userData');
 
         setState(() {
           userName = userData['userName'] ?? 'User';
@@ -292,7 +302,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
               .map((key, value) => MapEntry(key, value as int)));
 
           dailyIntake = dailyIntakes[selectedDate] ?? 0;
-          debugPrint('Firestore Listener setState: dailyIntake updated to $dailyIntake for selectedDate $selectedDate');
+          debugPrint(
+              'Firestore Listener setState: dailyIntake updated to $dailyIntake for selectedDate $selectedDate');
 
           String lastUpdateDateStr = userData['lastUpdateDate'] ??
               DateFormat('yyyy-MM-dd').format(DateTime.now());
@@ -311,7 +322,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
           }
         });
       } else {
-        debugPrint('Firestore Listener: User document does not exist. Creating initial document.');
+        debugPrint(
+            'Firestore Listener: User document does not exist. Creating initial document.');
         await _firestore.collection('users').doc(_userId).set({
           'userName': 'User',
           'defaultGoal': 2000,
@@ -322,7 +334,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
           'totalGoalsMet': 0,
           'totalIncompleteGoals': 0,
           'totalGoalsIncreased': 0,
-          'profileCreationDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+          'profileCreationDate':
+              DateFormat('yyyy-MM-dd').format(DateTime.now()),
           'dailyGoal': dailyGoal,
           'hourlyIntakes': {},
           'hourlySteps': {},
@@ -372,7 +385,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
         checkStreak();
       }
       isLoading = false;
-      debugPrint('Loaded data from SharedPreferences. dailyIntake: $dailyIntake');
+      debugPrint(
+          'Loaded data from SharedPreferences. dailyIntake: $dailyIntake');
     });
   }
 
@@ -385,7 +399,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
     if (_userId != null) {
       await _firestore.collection('users').doc(_userId).update({
         'dailyGoal': dailyGoal,
-      }).catchError((e) => debugPrint("Error updating dailyGoal in Firestore: $e"));
+      }).catchError(
+          (e) => debugPrint("Error updating dailyGoal in Firestore: $e"));
     }
     await prefs.setInt('dailyGoal', dailyGoal);
     debugPrint('_loadDailyGoal: Daily goal set to $dailyGoal ml.');
@@ -578,18 +593,29 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
                               });
 
                               if (_userId != null) {
-                                await _firestore.collection('users').doc(_userId).update({
+                                await _firestore
+                                    .collection('users')
+                                    .doc(_userId)
+                                    .update({
                                   'dailyGoal': dailyGoal,
                                   'totalGoalsIncreased': totalGoalsIncreased,
-                                  'lastUpdateDate': DateFormat('yyyy-MM-dd').format(DateTime.now()),
+                                  'lastUpdateDate': DateFormat('yyyy-MM-dd')
+                                      .format(DateTime.now()),
                                 });
-                                debugPrint('_increaseDailyGoal: Updated dailyGoal to $dailyGoal in Firestore.');
+                                debugPrint(
+                                    '_increaseDailyGoal: Updated dailyGoal to $dailyGoal in Firestore.');
                               }
-                              SharedPreferences prefs = await SharedPreferences.getInstance();
+                              SharedPreferences prefs =
+                                  await SharedPreferences.getInstance();
                               prefs.setInt('dailyGoal', dailyGoal);
-                              prefs.setInt('totalGoalsIncreased', totalGoalsIncreased);
-                              prefs.setString('lastUpdateDate', DateFormat('yyyy-MM-dd').format(DateTime.now()));
-                              debugPrint('_increaseDailyGoal: Updated dailyGoal to $dailyGoal in SharedPreferences.');
+                              prefs.setInt(
+                                  'totalGoalsIncreased', totalGoalsIncreased);
+                              prefs.setString(
+                                  'lastUpdateDate',
+                                  DateFormat('yyyy-MM-dd')
+                                      .format(DateTime.now()));
+                              debugPrint(
+                                  '_increaseDailyGoal: Updated dailyGoal to $dailyGoal in SharedPreferences.');
                             }
                             Navigator.of(context).pop();
                           },
@@ -683,7 +709,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
         }
         weatherIcon = prefs.getString('weatherIcon') ?? '';
       });
-      debugPrint('Loaded weather from SharedPreferences: $weatherDescription, $temperature°C');
+      debugPrint(
+          'Loaded weather from SharedPreferences: $weatherDescription, $temperature°C');
     }
   }
 
@@ -701,7 +728,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
       await _firestore.collection('users').doc(_userId).update({
         'streak': streak,
         'lastStreakUpdate': todayStr,
-      }).catchError((e) => debugPrint("Error updating streak in Firestore: $e"));
+      }).catchError(
+          (e) => debugPrint("Error updating streak in Firestore: $e"));
       SharedPreferences prefs = await SharedPreferences.getInstance();
       prefs.setInt('streak', streak);
       prefs.setString('lastStreakUpdate', todayStr);
@@ -717,15 +745,19 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
 
     await _firestore.collection('users').doc(_userId).update({
       'dailyIntakes.$selectedDate': intake,
-    }).catchError((e) => debugPrint("Error updating dailyIntake in Firestore: $e"));
-    debugPrint('updateDailyIntake: Firestore updated dailyIntakes.$selectedDate to $intake');
+    }).catchError(
+        (e) => debugPrint("Error updating dailyIntake in Firestore: $e"));
+    debugPrint(
+        'updateDailyIntake: Firestore updated dailyIntakes.$selectedDate to $intake');
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
     String dailyIntakesJson = jsonEncode(dailyIntakes);
     await prefs.setString('dailyIntakes', dailyIntakesJson);
-    debugPrint('updateDailyIntake: SharedPreferences updated dailyIntakes to $dailyIntakesJson');
+    debugPrint(
+        'updateDailyIntake: SharedPreferences updated dailyIntakes to $dailyIntakesJson');
 
-    if (intake >= dailyGoal && !goalMetToday) { // Use 'intake' parameter directly
+    if (intake >= dailyGoal && !goalMetToday) {
+      // Use 'intake' parameter directly
       checkStreak();
     }
   }
@@ -739,7 +771,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
     DateTime today = DateTime.now();
     String todayDate = DateFormat('yyyy-MM-dd').format(today);
 
-    debugPrint('addWater: Attempting to add $amount ml. selectedDate: $selectedDate, todayDate: $todayDate');
+    debugPrint(
+        'addWater: Attempting to add $amount ml. selectedDate: $selectedDate, todayDate: $todayDate');
 
     if (selectedDate != todayDate) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -766,7 +799,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
     // Trigger Firestore updates. The UI will react via the Firestore listener.
     await updateHourlyIntake(amount);
     await updateDailyIntake(newDailyIntake); // Pass the calculated new value
-    debugPrint('addWater: updateDailyIntake and updateHourlyIntake called for persistence.');
+    debugPrint(
+        'addWater: updateDailyIntake and updateHourlyIntake called for persistence.');
   }
 
   Future<void> _initializeProfileCreationDate() async {
@@ -775,16 +809,22 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
     DocumentSnapshot userDoc =
         await _firestore.collection('users').doc(_userId).get();
 
-    if (userDoc.exists && userDoc.data() != null && (userDoc.data() as Map<String, dynamic>).containsKey('profileCreationDate')) {
+    if (userDoc.exists &&
+        userDoc.data() != null &&
+        (userDoc.data() as Map<String, dynamic>)
+            .containsKey('profileCreationDate')) {
       String profileCreationDateString = userDoc['profileCreationDate'];
       dop = DateFormat('yyyy-MM-dd').parse(profileCreationDateString);
-      debugPrint('_initializeProfileCreationDate: Loaded DOP from Firestore: $dop');
+      debugPrint(
+          '_initializeProfileCreationDate: Loaded DOP from Firestore: $dop');
     } else {
       dop = DateTime.now();
       await _firestore.collection('users').doc(_userId).set({
         'profileCreationDate': DateFormat('yyyy-MM-dd').format(dop),
-      }, SetOptions(merge: true)).catchError((e) => debugPrint("Error setting profileCreationDate in Firestore: $e"));
-      debugPrint('_initializeProfileCreationDate: Set new DOP to Firestore: $dop');
+      }, SetOptions(merge: true)).catchError((e) =>
+          debugPrint("Error setting profileCreationDate in Firestore: $e"));
+      debugPrint(
+          '_initializeProfileCreationDate: Set new DOP to Firestore: $dop');
     }
     setState(() {});
   }
@@ -876,13 +916,17 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
 
     DocumentSnapshot userDoc =
         await _firestore.collection('users').doc(_userId).get();
-    if (userDoc.exists && userDoc.data() != null && (userDoc.data() as Map<String, dynamic>).containsKey('lastWaterIntake')) {
+    if (userDoc.exists &&
+        userDoc.data() != null &&
+        (userDoc.data() as Map<String, dynamic>)
+            .containsKey('lastWaterIntake')) {
       String? lastIntakeString = userDoc['lastWaterIntake'];
       if (lastIntakeString != null) {
         setState(() {
           lastWaterIntake = DateTime.parse(lastIntakeString);
         });
-        debugPrint('_loadLastWaterIntake: Loaded lastWaterIntake from Firestore: $lastWaterIntake');
+        debugPrint(
+            '_loadLastWaterIntake: Loaded lastWaterIntake from Firestore: $lastWaterIntake');
       }
     } else {
       SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -891,7 +935,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
         setState(() {
           lastWaterIntake = DateTime.parse(lastIntakeString);
         });
-        debugPrint('_loadLastWaterIntake: Loaded lastWaterIntake from SharedPreferences: $lastWaterIntake');
+        debugPrint(
+            '_loadLastWaterIntake: Loaded lastWaterIntake from SharedPreferences: $lastWaterIntake');
       }
     }
   }
@@ -955,7 +1000,9 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
 
     DocumentSnapshot userDoc =
         await _firestore.collection('users').doc(_userId).get();
-    if (userDoc.exists && userDoc.data() != null && (userDoc.data() as Map<String, dynamic>).containsKey('hourlyIntakes')) {
+    if (userDoc.exists &&
+        userDoc.data() != null &&
+        (userDoc.data() as Map<String, dynamic>).containsKey('hourlyIntakes')) {
       Map<String, dynamic> decoded = userDoc['hourlyIntakes'];
       setState(() {
         hourlyIntakes = decoded
@@ -968,10 +1015,11 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
       if (jsonString != null) {
         Map<String, dynamic> decoded = jsonDecode(jsonString);
         setState(() {
-          hourlyIntakes = decoded
-              .map((date, hours) => MapEntry(date, Map<String, int>.from(hours)));
+          hourlyIntakes = decoded.map(
+              (date, hours) => MapEntry(date, Map<String, int>.from(hours)));
         });
-        debugPrint('loadHourlyIntakes: Loaded hourlyIntakes from SharedPreferences.');
+        debugPrint(
+            'loadHourlyIntakes: Loaded hourlyIntakes from SharedPreferences.');
       }
     }
   }
@@ -990,8 +1038,10 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
 
     await _firestore.collection('users').doc(_userId).update({
       'hourlyIntakes.$date.$hour': hourlyIntakes[date]![hour],
-    }).catchError((e) => debugPrint("Error updating hourlyIntake in Firestore: $e"));
-    debugPrint('updateHourlyIntake: Firestore updated hourlyIntakes.$date.$hour to ${hourlyIntakes[date]![hour]}');
+    }).catchError(
+        (e) => debugPrint("Error updating hourlyIntake in Firestore: $e"));
+    debugPrint(
+        'updateHourlyIntake: Firestore updated hourlyIntakes.$date.$hour to ${hourlyIntakes[date]![hour]}');
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('hourlyIntakes', jsonEncode(hourlyIntakes));
@@ -1010,8 +1060,10 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
 
     await _firestore.collection('users').doc(_userId).update({
       'hourlySteps.$date.$hour': hourlySteps[date]![hour],
-    }).catchError((e) => debugPrint("Error updating hourlySteps in Firestore: $e"));
-    debugPrint('updateHourlySteps: Firestore updated hourlySteps.$date.$hour to ${hourlySteps[date]![hour]}');
+    }).catchError(
+        (e) => debugPrint("Error updating hourlySteps in Firestore: $e"));
+    debugPrint(
+        'updateHourlySteps: Firestore updated hourlySteps.$date.$hour to ${hourlySteps[date]![hour]}');
 
     SharedPreferences prefs = await SharedPreferences.getInstance();
     await prefs.setString('hourlySteps', jsonEncode(hourlySteps));
@@ -1023,7 +1075,9 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
 
     DocumentSnapshot userDoc =
         await _firestore.collection('users').doc(_userId).get();
-    if (userDoc.exists && userDoc.data() != null && (userDoc.data() as Map<String, dynamic>).containsKey('hourlySteps')) {
+    if (userDoc.exists &&
+        userDoc.data() != null &&
+        (userDoc.data() as Map<String, dynamic>).containsKey('hourlySteps')) {
       Map<String, dynamic> decoded = userDoc['hourlySteps'];
       setState(() {
         hourlySteps = decoded.map(
@@ -1041,7 +1095,8 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
             (date, hours) => MapEntry(date, Map<String, int>.from(hours)),
           );
         });
-        debugPrint('loadHourlySteps: Loaded hourlySteps from SharedPreferences.');
+        debugPrint(
+            'loadHourlySteps: Loaded hourlySteps from SharedPreferences.');
       }
     }
   }
@@ -1062,56 +1117,7 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
       },
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0E21),
-        appBar: AppBar(
-          scrolledUnderElevation: 0,
-          backgroundColor: const Color(0xFF0A0E21),
-          elevation: 0,
-          automaticallyImplyLeading: false,
-          toolbarHeight: 75,
-          flexibleSpace: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 0),
-            padding: const EdgeInsets.all(5),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.black.withOpacity(0.2),
-                  Colors.lightBlue.withOpacity(0.2),
-                ],
-              ),
-            ),
-            child: SafeArea(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const SizedBox(width: 10),
-                      Text(
-                        'HydraSense',
-                        style: GoogleFonts.pacifico(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w400,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Stay hydrated, stay healthy!',
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: Colors.white70,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
+        appBar: EnhancedSmartBottleAppBar(),
         body: isLoading
             ? const Center(
                 child: CircularProgressIndicator(
@@ -1119,301 +1125,270 @@ class ProfileDisplayScreenState extends State<ProfileDisplayScreen>
                 ),
               )
             : Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 0),
-          child: RefreshIndicator(
-            onRefresh: _reloadHomeScreen,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              child: Column(
-                children: [
-                  Consumer<ConnectionProvider>(
-                    builder: (context, connectionProvider, child) {
-                      return Container(
-                        width: double.infinity,
-                        color: connectionProvider.isConnected
-                            ? Colors.green[100]
-                            : Colors.red[100],
-                        padding: const EdgeInsets.all(8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              connectionProvider.isConnected
-                                  ? Icons.check_circle
-                                  : Icons.error,
-                              color: connectionProvider.isConnected
-                                  ? Colors.green
-                                  : Colors.red,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              connectionProvider.isConnected
-                                  ? "Bottle Connected"
-                                  : "Bottle Not Connected",
-                              style: TextStyle(
-                                color: connectionProvider.isConnected
-                                    ? Colors.green[800]
-                                    : Colors.red[800],
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-
-                  SizedBox(height: screenHeight * 0.02),
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.symmetric(horizontal: 20),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.cyan.shade900.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                padding: const EdgeInsets.symmetric(horizontal: 0),
+                child: RefreshIndicator(
+                  onRefresh: _reloadHomeScreen,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     child: Column(
                       children: [
-                        const SizedBox(height: 5),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildSleepInfoItem(
-                              icon: Icons.local_fire_department_sharp,
-                              title: '$streak',
-                              subtitle: 'Streak Days',
-                            ),
-                            _buildSleepInfoItem(
-                              icon: Icons.directions_walk_rounded,
-                              title: '$steps',
-                              subtitle: 'Steps Count',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 15),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            _buildSleepInfoItem(
-                              icon: Icons.water_drop_outlined,
-                              title: humidity == -1 ? 'Turn on' : '$humidity %',
-                              subtitle: 'Humidity',
-                            ),
-                            _buildSleepInfoItem(
-                              icon: Icons.wb_sunny_outlined,
-                              title: humidity == -1
-                                  ? 'Internet'
-                                  : '$temperature°C',
-                              subtitle: 'Temperature',
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: screenHeight * 0.02),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    height: screenHeight * 0.14,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF0A0E21),
-                    ),
-                    child: Center(
-                      child: DaySelectorWithSlides(
-                        isLoading: isLoading,
-                        dop: dop,
-                        selectedDateTime:
-                            DateFormat('yyyy-MM-dd').parse(selectedDate),
-                        dailyIntakes: dailyIntakes,
-                        dailyGoal: dailyGoal,
-                        onDateSelected: (date) {
-                          setState(() {
-                            selectedDate = date;
-                            dailyIntake = dailyIntakes[date] ?? 0;
-                            debugPrint('DaySelector: Selected date changed to $selectedDate. dailyIntake: $dailyIntake');
-                          });
-                        },
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: screenHeight * 0.02),
-
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 150,
-                          height: 150,
-                          child: CustomPaint(
-                            painter: CircularProgressPainter(
-                              progress: progress,
-                              backgroundColor: Colors.white.withOpacity(0.1),
-                              foregroundColor: Colors.blue,
-                              strokeWidth: 15,
-                            ),
-                            child: Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
+                        SizedBox(height: screenHeight * 0.02),
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.symmetric(horizontal: 20),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: Colors.cyan.shade900.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 5),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    "${(progress * 100).toInt()}%",
-                                    style: GoogleFonts.inter(
-                                      fontSize: 30,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
+                                  _buildSleepInfoItem(
+                                    icon: Icons.local_fire_department_sharp,
+                                    title: '$streak',
+                                    subtitle: 'Streak Days',
                                   ),
-                                  Text(
-                                    'Daily Goal',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 16,
-                                      color: Colors.white70,
-                                    ),
+                                  _buildSleepInfoItem(
+                                    icon: Icons.directions_walk_rounded,
+                                    title: '$steps',
+                                    subtitle: 'Steps Count',
                                   ),
                                 ],
                               ),
+                              const SizedBox(height: 15),
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _buildSleepInfoItem(
+                                    icon: Icons.water_drop_outlined,
+                                    title: humidity == -1
+                                        ? 'Turn on'
+                                        : '$humidity %',
+                                    subtitle: 'Humidity',
+                                  ),
+                                  _buildSleepInfoItem(
+                                    icon: Icons.wb_sunny_outlined,
+                                    title: humidity == -1
+                                        ? 'Internet'
+                                        : '$temperature°C',
+                                    subtitle: 'Temperature',
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: screenHeight * 0.02),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          height: screenHeight * 0.14,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF0A0E21),
+                          ),
+                          child: Center(
+                            child: DaySelectorWithSlides(
+                              isLoading: isLoading,
+                              dop: dop,
+                              selectedDateTime:
+                                  DateFormat('yyyy-MM-dd').parse(selectedDate),
+                              dailyIntakes: dailyIntakes,
+                              dailyGoal: dailyGoal,
+                              onDateSelected: (date) {
+                                setState(() {
+                                  selectedDate = date;
+                                  dailyIntake = dailyIntakes[date] ?? 0;
+                                  debugPrint(
+                                      'DaySelector: Selected date changed to $selectedDate. dailyIntake: $dailyIntake');
+                                });
+                              },
                             ),
                           ),
                         ),
-                        const SizedBox(width: 30),
-                        Expanded(
+                        SizedBox(height: screenHeight * 0.02),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              SizedBox(
+                                width: 150,
+                                height: 150,
+                                child: CustomPaint(
+                                  painter: CircularProgressPainter(
+                                    progress: progress,
+                                    backgroundColor:
+                                        Colors.white.withOpacity(0.1),
+                                    foregroundColor: Colors.blue,
+                                    strokeWidth: 15,
+                                  ),
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          "${(progress * 100).toInt()}%",
+                                          style: GoogleFonts.inter(
+                                            fontSize: 30,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                        Text(
+                                          'Daily Goal',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 16,
+                                            color: Colors.white70,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 30),
+                              Expanded(
+                                child: Container(
+                                  height: 150,
+                                  padding: const EdgeInsets.all(15),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(
+                                            'Daily Intake',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 15,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        '$dailyIntake ml',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      Text(
+                                        'of $dailyGoal ml goal',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 12,
+                                          color: Colors.white70,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 15),
+                                      GestureDetector(
+                                        onTap: () => _increaseDailyGoal(),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 8,
+                                            horizontal: 12,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.lightBlue
+                                                .withOpacity(0.2),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            'Adjust Goal',
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.blue,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
                           child: Container(
-                            height: 150,
-                            padding: const EdgeInsets.all(15),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
+                              color: Colors.cyan.shade900.withOpacity(0.05),
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Row(
                                   children: [
+                                    const Icon(
+                                      Icons.tips_and_updates,
+                                      color: Colors.amber,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 8),
                                     Text(
-                                      'Daily Intake',
+                                      'Daily Suggestions',
                                       style: GoogleFonts.inter(
-                                        fontSize: 15,
+                                        fontSize: 16,
                                         fontWeight: FontWeight.bold,
                                         color: Colors.white,
                                       ),
                                     ),
                                   ],
                                 ),
-                                Text(
-                                  '$dailyIntake ml',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                Text(
-                                  'of $dailyGoal ml goal',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 12,
-                                    color: Colors.white70,
-                                  ),
-                                ),
                                 const SizedBox(height: 15),
-                                GestureDetector(
-                                  onTap: () => _increaseDailyGoal(),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      vertical: 8,
-                                      horizontal: 12,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.lightBlue.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      'Adjust Goal',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.blue,
-                                      ),
-                                    ),
-                                  ),
+                                _buildSuggestionItem(
+                                  icon: Icons.wb_sunny,
+                                  text: _getHydrationRecommendation(),
+                                ),
+                                const SizedBox(height: 12),
+                                _buildSuggestionItem(
+                                  icon: Icons.directions_walk,
+                                  text: _getHydrationMessage(steps),
+                                ),
+                                const SizedBox(height: 12),
+                                _buildSuggestionItem(
+                                  icon: Icons.access_time,
+                                  text: _getLastIntakeMessage(),
+                                ),
+                                const SizedBox(height: 12),
+                                _buildSuggestionItem(
+                                  icon: Icons.show_chart,
+                                  text: _getGoalProgressMessage(
+                                      dailyIntake, dailyGoal),
+                                ),
+                                const SizedBox(height: 12),
+                                _buildSuggestionItem(
+                                  icon: Icons.trending_up,
+                                  text:
+                                      "You're $streak days into your hydration streak!",
                                 ),
                               ],
                             ),
                           ),
                         ),
+                        SizedBox(height: screenHeight * 0.008),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 20),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.cyan.shade900.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.tips_and_updates,
-                                color: Colors.amber,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Daily Suggestions',
-                                style: GoogleFonts.inter(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 15),
-                          _buildSuggestionItem(
-                            icon: Icons.wb_sunny,
-                            text: _getHydrationRecommendation(),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildSuggestionItem(
-                            icon: Icons.directions_walk,
-                            text: _getHydrationMessage(steps),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildSuggestionItem(
-                            icon: Icons.access_time,
-                            text: _getLastIntakeMessage(),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildSuggestionItem(
-                            icon: Icons.show_chart,
-                            text: _getGoalProgressMessage(dailyIntake, dailyGoal),
-                          ),
-                          const SizedBox(height: 12),
-                          _buildSuggestionItem(
-                            icon: Icons.trending_up,
-                            text: "You're $streak days into your hydration streak!",
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  Text(
-                    distance != null ? 'Distance: $distance cm' : 'Waiting...',
-                    style: const TextStyle(fontSize: 20, color: Colors.white70),
-                  ),
-                  SizedBox(height: screenHeight * 0.008),
-                ],
+                ),
               ),
-            ),
-          ),
-        ),
         bottomNavigationBar: BottomNavBar(
           currentIndex: 0,
           addWater: () => addWater(250),

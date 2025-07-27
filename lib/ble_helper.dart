@@ -10,29 +10,29 @@ class BLEHelper {
     BuildContext context,
     BluetoothDevice device,
   ) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Dialog(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-              ),
-              SizedBox(height: 20),
-              Text(
-                'Connecting...',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    // showDialog(
+    //   context: context,
+    //   barrierDismissible: false,
+    //   builder: (context) => const Dialog(
+    //     backgroundColor: Colors.transparent,
+    //     elevation: 0,
+    //     child: Center(
+    //       child: Column(
+    //         mainAxisSize: MainAxisSize.min,
+    //         children: [
+    //           CircularProgressIndicator(
+    //             valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+    //           ),
+    //           SizedBox(height: 20),
+    //           Text(
+    //             'Connecting...',
+    //             style: TextStyle(color: Colors.white, fontSize: 16),
+    //           ),
+    //         ],
+    //       ),
+    //     ),
+    //   ),
+    // );
 
     try {
       await device.connect(timeout: const Duration(seconds: 10));
@@ -72,7 +72,7 @@ class BLEHelper {
         }
       });
 
-      Navigator.pop(context);
+      // Navigator.pop(context);
 
       Navigator.pushReplacement(
         context,
